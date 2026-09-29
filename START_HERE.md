@@ -1,6 +1,6 @@
 # Quick start: Telegram in your AI client
 
-The easiest way is to send this to Codex or Gemini CLI on your computer:
+The easiest way is to send this to your local AI client on your computer:
 
 > Install https://github.com/prabchevski/telegram-mcp for my current client.
 > Follow AGENTS.md and INSTALL.md, select the package for my operating system,

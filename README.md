@@ -4,7 +4,7 @@ Connect **your own Telegram account** to **Codex or Gemini CLI on macOS**, **Cod
 
 ## Give this link to your AI agent
 
-Paste this into Codex or Gemini CLI on the computer where you want to install it:
+Paste this into your local AI client on the computer where you want to install it:
 
 > Install https://github.com/prabchevski/telegram-mcp for the client I am using now. Read AGENTS.md and INSTALL.md, detect my operating system, download the matching archive from the latest release, and verify its SHA-256. If it is already installed, upgrade it while preserving my Telegram login and other settings. Complete the available checks; I will handle the first login in a local window without sharing secrets in chat.
 
@@ -366,8 +366,8 @@ uv run --frozen python -I scripts/release.py build --output dist
 ```
 
 Tests use isolated profiles and settings and do not require a Telegram account.
-CI tests Linux/macOS and native Windows x64, and builds and installs an allowlisted source archive on a
-GitHub-hosted Mac. This is a test environment, not the maintainer's or users' Macs.
+CI tests Linux/macOS and native Windows x64 on Windows Server 2025, and builds and
+installs an allowlisted source archive on a GitHub-hosted Mac. This is a test environment, not the maintainer's or users' Macs.
 After these checks pass on main, CI publishes each new package version to
 [GitHub Releases](https://github.com/prabchevski/telegram-mcp/releases/latest), with
 the verified archive, checksum, file inventory and wheel. Existing published tags

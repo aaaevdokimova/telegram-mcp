@@ -1,7 +1,8 @@
 # Install from a repository link: instructions for AI agents
 
-This is the entry point for **Codex and Gemini CLI** when a user provides the
-repository link and asks to install or upgrade it. Perform the installation,
+This is the entry point for **Codex, Gemini CLI, and ChatGPT Work agents with
+local computer access** when a user provides the repository link and asks to
+install or upgrade it. Perform the installation,
 instead of only describing commands. That request authorizes normal dependency
 setup, configuration of the selected client, and connection checks; do not ask
 for the same general permission again. Do not change a personal installation

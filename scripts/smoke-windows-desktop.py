@@ -200,7 +200,9 @@ def write_guest(oem: Path, windows: str, archive: Path, uv_zip: Path) -> None:
         if len(entries) != 1:
             raise RuntimeError("Expected one uv.exe in the verified bootstrap archive")
         (oem / "uv.exe").write_bytes(bundle.read(entries[0]))
-    password = "Temporary-" + secrets.token_hex(20) + "-9aA"
+    # net.exe asks an interactive compatibility question above 14 characters.
+    # This short-lived account exists only inside an unexposed disposable VM.
+    password = "T9a-" + secrets.token_hex(5)
     bootstrap = GUEST_BOOTSTRAP.replace("@EXPECTED_WINDOWS@", windows).replace("@TEST_PASSWORD@", password)
     guest = GUEST_TEST.replace("@EXPECTED_WINDOWS@", windows)
     # Windows PowerShell 5.1 recognizes UTF-8 with BOM reliably.
