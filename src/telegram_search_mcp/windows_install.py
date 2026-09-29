@@ -1,4 +1,4 @@
-"""Native Windows installation and local ChatGPT Work plugin registration.
+"""Native Windows installation and local Codex/ChatGPT Work plugin registration.
 
 Program versions are immutable. The source archive never contains a profile;
 credentials and the TDLib session are created only by the owner's local auth.
@@ -262,7 +262,9 @@ def main() -> None:
         if ready.returncode != 0:
             subprocess.run([result["python"], "-I", "-X", "utf8", "-m", "telegram_search_mcp.cli", "auth"], check=True)
         subprocess.run([result["python"], "-I", "-X", "utf8", "-m", "telegram_search_mcp.cli", "doctor", "--connect"], check=True)
-    print("Restart ChatGPT. In Work, open Plugins, choose Personal, and install Telegram MCP. Start a new chat.")
+    print("Restart your Codex or ChatGPT desktop app. Open Plugins, choose your personal marketplace, "
+          "and install Telegram MCP. Start a new chat in Codex or Work. "
+          "For Codex CLI, open /plugins after restarting it.")
 
 
 if __name__ == "__main__":

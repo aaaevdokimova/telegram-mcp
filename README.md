@@ -1,35 +1,41 @@
 # Telegram MCP · 0.9.1
 
-Browse and search Telegram chats, download files, transcribe voice messages, and optionally
-save drafts, reply, or schedule text and files with
-**ChatGPT Work on Windows x64** and **Codex and Gemini CLI on macOS**.
-One installation and one Telegram login serve multiple client sessions at the same time.
-This is an unofficial project. Gemini's web and mobile apps are not supported.
+Подключите **свой Telegram** к **Codex или Gemini CLI на macOS**, **Codex на Windows x64** либо **ChatGPT Work с локальными плагинами на Windows x64**. Можно искать и читать сообщения, скачивать вложения, расшифровывать голосовые, а при отдельном включении — готовить и отправлять сообщения. Один локальный сервис обслуживает несколько чатов и клиентов с одним входом в Telegram.
 
-## ChatGPT Work on Windows
+## Дайте эту ссылку своему AI-агенту
 
-Native Windows x64 support is available through a local desktop plugin. Download the verified `telegram-mcp-windows.zip` release asset, extract it, then run `install-windows.ps1` in 64-bit PowerShell. The installer downloads a checksum-pinned uv runtime, installs Python 3.13 and locked dependencies, verifies TDLib, and adds Telegram MCP to your personal plugin marketplace. Sign in to **your own** Telegram account locally, restart ChatGPT, then install **Telegram MCP** from **Plugins → Personal** in Work.
+Скопируйте в Codex или Gemini CLI на нужном компьютере:
 
-See [the Windows guide](INSTALL_WINDOWS.md) for the exact command, prerequisites, updates, sending, and removal. No WSL, public MCP endpoint, or tunnel is required. Windows updates are manual in this release. Native Windows ARM64 and ChatGPT web are outside this installation path. End-to-end use inside Windows ChatGPT still requires a user acceptance check; automated checks cover the native runtime, isolated installation and MCP transport.
+> Установи https://github.com/prabchevski/telegram-mcp для того клиента, которым я сейчас пользуюсь. Прочитай AGENTS.md и INSTALL.md, определи мою ОС, скачай подходящий архив последнего релиза и проверь SHA-256. Если установка уже есть — обнови её, сохрани вход в Telegram и остальные настройки. Выполни доступные проверки; первый вход я пройду в локальном окне, без передачи секретов в чат.
 
-## Install with Codex or Gemini CLI
+Агент выберет инструкции для вашей ОС и клиента. Запрос «установи» уже разрешает обычную установку, зависимости и настройку выбранного клиента. Для первого подключения нужны ваши `api_id` и `api_hash` с [my.telegram.org](https://my.telegram.org): вводите их, код входа и пароль 2FA **только в локальном окне авторизации**. Существующий совместимый вход сохраняется. Перезапуск клиента или включение плагина может потребовать вашего действия.
 
-Send this to Codex or Gemini CLI on your Mac:
+**Для устанавливающего агента: начните с [AGENTS.md](AGENTS.md) → [INSTALL.md](INSTALL.md).** Не устанавливайте рабочую копию при простом просмотре или разработке проекта.
 
-> Install https://github.com/prabchevski/telegram-mcp for the client I am using. Follow
-> INSTALL.md, upgrade my older installation if present, preserve my
-> Telegram login, and enable daily updates from main after successful checks.
+## Выберите свою систему
 
-**For the installing agent:** read [AGENTS.md](AGENTS.md) and
-[INSTALL.md](INSTALL.md) before changing the installation.
-Either assistant can prepare dependencies, migrate a compatible saved login, configure the
-client, and check the installation. First-time Telegram authorization, passwords,
-and any required macOS approval remain with the owner in their private Terminal.
-A client restart may be needed.
+| Система и клиент | Способ подключения | Инструкция |
+| --- | --- | --- |
+| macOS Apple Silicon / Intel · Codex app или CLI | Локальный MCP, настройка Codex | [Установка на macOS](INSTALL_MACOS.md) |
+| macOS Apple Silicon / Intel · Gemini CLI | Локальный MCP, настройка Gemini CLI; Codex не требуется | [Установка на macOS](INSTALL_MACOS.md) |
+| Windows x64 · Codex desktop / CLI с поддержкой плагинов | Личный каталог плагинов → Telegram MCP | [Установка на Windows](INSTALL_WINDOWS.md) |
+| Windows x64 · ChatGPT Work с локальными плагинами | Личный каталог плагинов → Telegram MCP | [Установка на Windows](INSTALL_WINDOWS.md) |
 
-Prefer a manual installation? **[Download for macOS](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-macos.zip)**,
-extract the ZIP, and open `install-macos.command`. No manual build is needed.
-See the [quick start](START_HERE.md).
+Gemini в браузере/на телефоне и обычный веб-чат ChatGPT не запускают этот локальный MCP. Пакета для нативного Windows ARM64 нет. На Windows не требуются WSL, публичный сервер или туннель. Нужен установленный клиент с поддержкой указанного способа подключения.
+
+Для ручной установки: **[macOS ZIP](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-macos.zip)** ([SHA-256](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-macos.zip.sha256)) · **[Windows ZIP](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-windows.zip)** ([SHA-256](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-windows.zip.sha256)). [Краткие шаги установки](START_HERE.md). Эти ссылки ведут на последний опубликованный релиз; архивы в разделе **Assets** содержат готовые установщики. Стандартные ссылки GitHub **Source code** не заменяют Windows-пакет.
+
+На macOS установка по умолчанию включает ежедневные обновления из `main` после успешных проверок. На Windows обновление выполняется повторным запуском нового установщика. Каждый пользователь входит в собственный аккаунт; репозиторий и релизы не содержат чужих сессий или ключей. Найденные сообщения передаются выбранному AI-клиенту. Это неофициальный проект.
+
+## Как пользоваться
+
+- «Найди в моём Telegram сообщения про встречу в пятницу».
+- «Покажи непрочитанные чаты» или «Что обсуждали вчера в этой группе?».
+- «Сохрани присланную таблицу» или «Расшифруй это голосовое».
+
+Сначала агент ищет по доступной истории аккаунта и подпискам. Для отдельного поиска публичных публикаций он проверяет реальный остаток бесплатных попыток, объясняет расход и **ждёт вашего согласия**. Оплата Stars отключена. По умолчанию доступны 15 инструментов; отправка выключена и добавляет ещё 4 только после включения. Подробнее — [публичный поиск](#free-public-channel-post-search) и [отправка](#optional-text-and-file-sending).
+
+Автопроверки покрывают ядро на macOS, Windows и Linux, установщики и MCP-соединение. Реальный вход в Telegram и работу интерфейса выбранного клиента проверяют на компьютере пользователя. Intel macOS использует сборку закреплённой версии TDLib; автоматическая проверка установки на Mac выполняется на Apple Silicon. Точные границы проверки описаны в [VERIFICATION.md](VERIFICATION.md).
 
 ## Features
 
@@ -310,8 +316,8 @@ two old clients use different accounts, the owner chooses one. A busy old profil
 must be released by its client before migration. Old archives require one upgrade
 through the installer/Codex to gain automatic updates.
 
-New interactive installs enable **daily updates from main after successful GitHub
-checks**. The Mac checks GitHub locally; a commit does not remotely deploy onto
+New macOS interactive installs enable **daily updates from main after successful GitHub
+checks**. Windows updates use the latest release installer as described in [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md). The Mac checks GitHub locally; a commit does not remotely deploy onto
 other computers. Updates keep immutable program versions and preserve the login.
 New MCP processes use the new code; the shared service switches on its next start,
 after active work ends and the service becomes idle. An offline or sleeping Mac
@@ -337,8 +343,8 @@ data, Keychain/Credential Manager entries, policy.json, TDLib database, or sessi
 ## Documentation
 
 - [Quick start](START_HERE.md)
-- [ChatGPT Work on Windows](INSTALL_WINDOWS.md)
-- [Install with AI: Codex or Gemini CLI](INSTALL.md)
+- [Codex and ChatGPT Work on Windows](INSTALL_WINDOWS.md)
+- [Install with an AI agent: platform and client routing](INSTALL.md)
 - [Installation, updates, and troubleshooting](INSTALL_MACOS.md)
 - [Uninstallation and Telegram session revocation](UNINSTALL_MACOS.md)
 - [Architecture and limitations](ARCHITECTURE.md)
@@ -380,4 +386,4 @@ Third-party dependencies retain their own licenses.
 - [Telegram: API credentials](https://core.telegram.org/api/obtaining_api_id)
 - [TDLib: pinned source](https://github.com/tdlib/td/tree/d1085f9cebc5a62379991ae1652673954f229c1f)
 
-Integration settings and native voice transcription were checked on September 16, 2026.
+Release checks and platform-specific acceptance limits are recorded in [VERIFICATION.md](VERIFICATION.md).

@@ -35,7 +35,9 @@ def current_notes(source: Path, version: str) -> str:
         if expected not in (source / name).read_text():
             raise RuntimeError(f'{name} does not describe the current version')
     changes = sections[0].split('\n', 1)[1].strip()
-    return f'''Telegram MCP for ChatGPT Work on Windows x64 and Codex and Gemini CLI on macOS: chat navigation, unread history, chat search and free public channel posts search, local file downloads, Telegram-native voice/video-note transcription, and optional drafts, replies and scheduled text/document sending. Fifteen tools by default, nineteen with sending enabled. Search account history first; inspect the account's public-search quota and obtain explicit user confirmation before a new public search. Paid searches are never authorized.
+    return f'''Local Telegram MCP for **Codex on macOS and Windows x64**, **Gemini CLI on macOS**, and **ChatGPT Work on Windows x64**. Search chats and subscriptions, read history, download media, transcribe voice messages, and optionally prepare and send messages. Fifteen tools by default, nineteen with sending enabled.
+
+Public channel search is optional: first search account history, then check the account's actual free quota, explain the cost and wait for explicit user confirmation. Paid Stars searches are disabled in code.
 
 ## Changes in {version}
 
@@ -43,9 +45,18 @@ def current_notes(source: Path, version: str) -> str:
 
 ## Install or upgrade
 
-Windows: download **telegram-mcp-windows.zip**, extract it and run **install-windows.ps1**; see [Windows setup](https://github.com/{REPOSITORY}/blob/v{version}/INSTALL_WINDOWS.md). Install the resulting local plugin from ChatGPT Work Plugins. Windows updates are manual.
+Give your local agent this instruction:
 
-macOS: download **telegram-mcp-macos.zip** and its **.sha256**, verify the checksum, extract it and open **install-macos.command**. A compatible Telegram login is preserved. Restart Codex/Gemini CLI after installation. Each user keeps their own Telegram account and credentials on their Mac.
+> Install Telegram MCP from https://github.com/{REPOSITORY}. Read INSTALL.md, detect my operating system and client, install the latest verified release and check the connection. I will enter Telegram credentials in the local login window.
+
+| Platform and client | Download | Instructions |
+| --- | --- | --- |
+| macOS: Codex or Gemini CLI | [telegram-mcp-macos.zip](https://github.com/{REPOSITORY}/releases/download/v{version}/telegram-mcp-macos.zip) · [SHA-256](https://github.com/{REPOSITORY}/releases/download/v{version}/telegram-mcp-macos.zip.sha256) | [macOS setup](https://github.com/{REPOSITORY}/blob/v{version}/INSTALL_MACOS.md) |
+| Windows x64: Codex desktop or ChatGPT Work | [telegram-mcp-windows.zip](https://github.com/{REPOSITORY}/releases/download/v{version}/telegram-mcp-windows.zip) · [SHA-256](https://github.com/{REPOSITORY}/releases/download/v{version}/telegram-mcp-windows.zip.sha256) | [Windows setup](https://github.com/{REPOSITORY}/blob/v{version}/INSTALL_WINDOWS.md) |
+
+Verify the matching checksum before extracting. On Windows, run **install-windows.ps1** and enable the local Telegram MCP plugin in **Plugins → Personal** in Codex or ChatGPT Work. On macOS, open **install-macos.command** or follow the agent guide to register the requested client directly. Restart the client after installation. Compatible existing Telegram logins are preserved; every new user signs in to their own account locally.
+
+Windows updates are manual; rerun the new release's installer. The Windows installer and MCP launch are tested in native Windows CI; real client UI activation and account login happen on the user's computer. Native Windows ARM64 is not supported.
 
 [Installation guide](https://github.com/{REPOSITORY}/blob/v{version}/INSTALL.md) · [Verification and limits](https://github.com/{REPOSITORY}/blob/v{version}/VERIFICATION.md)
 

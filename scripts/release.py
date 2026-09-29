@@ -32,7 +32,7 @@ IGNORED_DIRS = frozenset(
     {".git", ".venv", ".pytest_cache", "__pycache__", "dist", ".ruff_cache", ".mypy_cache"}
 )
 REQUIRED_FILES = frozenset(
-    {"pyproject.toml", "uv.lock", "README.md", "LICENSE", "AGENTS.md", "INSTALL.md", "INSTALL_MACOS.md", "START_HERE.md",
+    {"pyproject.toml", "uv.lock", "README.md", "LICENSE", "AGENTS.md", "GEMINI.md", "INSTALL.md", "INSTALL_MACOS.md", "INSTALL_WINDOWS.md", "START_HERE.md",
      "UNINSTALL_MACOS.md", "install-macos.command", "uninstall-macos.command", "scripts/release.py",
      "scripts/install.py", WINDOWS_ASSETS_SOURCE, "src/telegram_search_mcp/__init__.py"}
 )

@@ -2,6 +2,8 @@
 
 ## 0.9.1 — 2026-09-29
 
+- Publish the Windows x64 installer for both Codex desktop and ChatGPT Work, alongside the macOS installer for Codex and Gemini CLI. This is the first published release of the Windows and public-search changes developed in 0.9.0.
+- Make the repository URL the installation entry point: client/platform selection, verified release downloads, local Telegram login, registration, diagnostics, updates and removal are linked from README and the agent installation guide.
 - Add read-only `telegram_get_public_search_quota` to inspect the account's live limits without consuming a public-search attempt. Discovery now has 15 tools by default, or 19 with sending.
 - Require the agent to search account history/subscriptions first, explain the public scope and current free allowance, ask for explicit permission and wait before every new public query. Include this workflow in portable MCP instructions, tool descriptions and installation guides; never assume a fixed daily allowance or offer Stars payment.
 - Gate the initial public search with a five-minute single-use confirmation token bound to the account, query and quota snapshot, plus `user_confirmed=true`. Changed quota requires a fresh check and consent; the flag is the agent's report of human consent. Free native continuation remains within the approved query.

@@ -1,4 +1,12 @@
-# Installation, updates, and troubleshooting
+# macOS: установка, обновления и устранение неполадок
+
+Этот установщик подключает локальный MCP к **Codex app/CLI, Gemini CLI или обоим**.
+Для установки нейронкой дайте ей ссылку на репозиторий и попросите следовать
+[INSTALL.md](INSTALL.md). Для кратких ручных шагов — [START_HERE.md](START_HERE.md).
+Windows использует отдельный [пакет и инструкцию](INSTALL_WINDOWS.md).
+
+Ниже приведены точные команды и подробности обновления. Первый вход выполняется
+в вашем локальном Terminal; секреты и QR-код не нужно передавать в чат.
 
 ## Requirements
 
@@ -13,13 +21,24 @@ For setup through Codex or Gemini CLI, use [INSTALL.md](INSTALL.md).
 
 ## Download and install
 
-[Download the verified release ZIP](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-macos.zip),
-extract it, and open `install-macos.command`. No GitHub account or manual build is
-required. You can also run a command from the extracted directory:
+Open the [latest published release](https://github.com/prabchevski/telegram-mcp/releases/latest).
+Under **Assets**, download `telegram-mcp-macos.zip` and
+`telegram-mcp-macos.zip.sha256` from that same release. No GitHub account or manual
+build is required. In Terminal, change to the directory containing both files and verify:
+
+```sh
+shasum -a 256 -c telegram-mcp-macos.zip.sha256
+```
+
+Continue only when the result is `OK`. Extract the ZIP, open `install-macos.command`,
+and select Codex, Gemini CLI or both. Alternatively, run **one** matching command
+from the extracted directory:
 
 ```sh
 bash install-macos.command --clients codex
+# Or, for Gemini CLI:
 bash install-macos.command --clients gemini
+# Or, only when both clients are wanted:
 bash install-macos.command --clients both
 ```
 

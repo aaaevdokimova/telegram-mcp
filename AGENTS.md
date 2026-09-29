@@ -3,9 +3,25 @@
 ## Installing for a user
 
 When the user explicitly asks to install or upgrade Telegram MCP from this
-repository, follow [INSTALL.md](INSTALL.md). Read that guide
-before changing their installation. It covers existing archives, local login, and
-daily updates. A repository URL alone does not authorize installation.
+repository (for example, gives the URL and says “install”), treat that as
+authorization for the normal setup: platform/client detection, the official release,
+dependency installation, local client registration and non-content verification.
+Do not ask again for permission already given. Read [INSTALL.md](INSTALL.md) before
+changing their installation; it routes macOS Codex/Gemini CLI and Windows Codex /
+ChatGPT Work, explains release checks and preserves existing logins and settings.
+
+Choose the current local client unless the user named another. Download the latest
+published platform asset from the canonical repository, pin its resolved release
+tag, and verify its matching SHA-256 before extraction/execution. GitHub's generic
+source ZIP does not contain the generated Windows installer. Do not install a
+personal profile merely to review or develop this repository; a URL alone without
+an installation request does not authorize setup.
+
+First-time Telegram authorization, API secrets, QR codes, login codes and 2FA belong
+in the owner's uncaptured local Terminal/PowerShell window. Never request or display
+them in the AI chat. Continue every independent preparation and verification step
+before reporting a remaining owner action. Do not call a registration successful
+end-to-end client use without actual MCP/account connection evidence.
 
 ## Using public search
 

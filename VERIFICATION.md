@@ -1,6 +1,6 @@
 # Verification
 
-## Version 0.9.1 — Public-search quota and explicit consent
+## Version 0.9.1 — Windows release, public-search quota and explicit consent
 
 This change adds a read-only quota operation and requires a fresh account/query/
 quota-bound confirmation token and an explicit confirmation flag before the
@@ -9,15 +9,25 @@ changed quota, zero Stars, and free same-query continuation. The flag reports
 consent collected by the agent; it is not independent proof of a human response.
 No live Telegram search is used during development and no free quota is consumed.
 
-Local full-suite verification: 499 tests passed, with 9 native Windows tests skipped.
-Source inventory audit passed with 92 files. Packaged installer and Windows CI
-results are recorded against the current commit. Expected discovery is 15/19/15 tools, with public search marked
+The quota implementation passed 499 local tests, with 9 native Windows tests skipped,
+and 252 native Windows tests plus actual installation/update smoke checks in
+[CI run 36594846622](https://github.com/prabchevski/telegram-mcp/actions/runs/36594846622)
+at commit `dfc02409276fa36da1d8d9e70411c67b43153b4d`.
+Source inventory audit passed with 92 files. The final release additionally includes
+the shared Codex/ChatGPT Work Windows wording and consolidated installation guides.
+That final source tree passed 499 local tests (9 Windows-only skips), the 93-file
+source audit, archive/wheel checks, the actual macOS installer, and the unmodified
+0.6.1 updater smoke checks. `GEMINI.md` and both platform installation guides are
+required release files.
+Its authoritative results are the successful **Test and package** run for the release tag's
+commit on `main`; publication runs only after all platform checks pass.
+Expected discovery is 15/19/15 tools, with public search marked
 non-read-only and quota checks marked read-only. Both platform smoke checks also
 assert the default-false confirmation schema and token field.
 
 Version 0.9.1 permits replacing an idle 0.9.0 shared service before using the new
 operation. Active operations remain protected. User account authorization and the
-Windows ChatGPT Work interface still require acceptance on the target computer,
+Windows Codex/ChatGPT Work interface still require acceptance on the target computer,
 including two simultaneous chats and closing the chat that started the service.
 
 ## Version 0.9.0 — Windows and free public posts search
