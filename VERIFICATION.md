@@ -1,16 +1,38 @@
 # Verification
 
+## Version 0.9.1 — Public-search quota and explicit consent
+
+This change adds a read-only quota operation and requires a fresh account/query/
+quota-bound confirmation token and an explicit confirmation flag before the
+initial public search. Tests cover missing, expired, reused and mismatched tokens,
+changed quota, zero Stars, and free same-query continuation. The flag reports
+consent collected by the agent; it is not independent proof of a human response.
+No live Telegram search is used during development and no free quota is consumed.
+
+Local full-suite verification: 499 tests passed, with 9 native Windows tests skipped.
+Source inventory audit passed with 92 files. Packaged installer and Windows CI
+results are recorded against the current commit. Expected discovery is 15/19/15 tools, with public search marked
+non-read-only and quota checks marked read-only. Both platform smoke checks also
+assert the default-false confirmation schema and token field.
+
+Version 0.9.1 permits replacing an idle 0.9.0 shared service before using the new
+operation. Active operations remain protected. User account authorization and the
+Windows ChatGPT Work interface still require acceptance on the target computer,
+including two simultaneous chats and closing the chat that started the service.
+
 ## Version 0.9.0 — Windows and free public posts search
 
 Source baseline: remote main `9652983` (0.8.0). The unmodified baseline passed 308 tests on macOS. Changes add Windows ACL/locking/credential tests, mutually authenticated loopback transport tests, plugin registration preservation tests, and a Windows x64 CI job. The installer smoke check uses temporary program and marketplace directories, verifies the pinned native DLL, performs two immutable installations, and checks MCP discovery with 14/18/14 tools without authorizing Telegram or invoking a Telegram tool.
 
 Local macOS result: 457 tests passed, with 9 native Windows tests skipped. Native
-Windows CI also exercises inherited directory ACLs, Windows PowerShell 5.1,
+Windows CI passed 218 tests and also exercises inherited directory ACLs, Windows PowerShell 5.1,
 Cyrillic installation paths, and Unicode MCP traffic through both ordinary and
 hidden-console launchers. Actual macOS installation/update and the unmodified
 0.6.1 updater passed in disposable installations. Archive, wheel, and publication
 asset verification passed; generated Windows assets are checked against their
 reviewed source literals.
+
+Historical 0.9.0 CI: [successful run 36593192902](https://github.com/prabchevski/telegram-mcp/actions/runs/36593192902).
 
 Verification status is recorded in the change's CI results. A successful automated run does not establish that a real Windows ChatGPT Work UI has installed the plugin or that a user's Telegram account has authorized successfully. Those two acceptance steps remain with the Windows user. This work never changes a developer's real profile, Keychain/Credential Manager entries, or client settings.
 

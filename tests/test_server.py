@@ -90,6 +90,7 @@ async def test_server_exposes_reads_and_explicit_speech_request() -> None:
     assert {tool.name for tool in result.tools} == {
         "telegram_search_messages",
         "telegram_search_public_posts",
+        "telegram_get_public_search_quota",
         "telegram_get_message",
         "telegram_get_context",
         "telegram_get_media", "telegram_list_voice_messages", "telegram_transcribe_voice",

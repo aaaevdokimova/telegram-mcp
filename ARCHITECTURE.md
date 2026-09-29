@@ -16,7 +16,8 @@ The `tdlib.lock` file continues to protect the TDLib database.
 
 The service accepts a fixed set of requests: the original four read operations,
 voice listing, explicitly requested speech recognition, local diagnostics/shutdown,
-bounded navigation/download operations, free public posts search, and four optional outgoing/draft operations. Sending is disabled
+bounded navigation/download operations, public-search quota checks and consented
+free public posts search, and four optional outgoing/draft operations. Sending is disabled
 unless enabled locally. It does not accept arbitrary TDLib methods, Python function
 names, or commands to execute through the connection. Only outgoing preparation
 can accept a bounded local attachment path; downloads export into a fixed private profile directory.
@@ -137,19 +138,38 @@ in the profile. Sending and transcription are explicit operations; transcription
 may consume Telegram's free quota. Authorization, the local database, cache, and
 installation settings also change as needed.
 
-## Free public posts search (0.9)
+## Free public posts search and consent (0.9.1)
 
 `telegram_search_public_posts` is distinct from account-history and per-chat
-search. The serial owner checks `getPublicPostSearchLimits` and performs at most
-one `searchPublicPosts` with `star_count=0`. There is no payment argument or paid
-retry. It can consume a free quota slot, so the MCP tool is non-read-only and
+search. Portable MCP initialization instructions require the agent to search
+account history/subscriptions first, then offer broader public search. The
+read-only `telegram_get_public_search_quota(query)` calls
+`getPublicPostSearchLimits` without running a search. The agent explains the live
+remaining free attempts, wait and whether the query consumes an attempt, asks
+for explicit permission, and waits for the user's answer. No fixed daily limit
+is assumed. New queries and reformulations need a fresh check and permission.
+
+The shared service issues a bounded, memory-only confirmation token for the
+account, normalized query and quota snapshot. It expires after five minutes and
+is consumed once. Initial public search requires this token and
+`user_confirmed=true`; the owner checks the quota again before native dispatch.
+Missing/invalid confirmation and a changed snapshot have separate outcomes and
+do not start a search. The flag reports consent collected by the agent; the
+backend cannot independently verify a human conversational response. Tokens
+vanish on service restart and cannot authorize another account or query.
+
+The serial owner performs at most one `searchPublicPosts` with `star_count=0`.
+There is no payment argument, Stars purchase, paid retry or offered paid fallback.
+Search can consume a free quota slot, so its MCP tool is non-read-only and
 non-idempotent. Quota/access/unsupported outcomes never masquerade as empty success.
 
 Native offsets remain inside a bounded daemon-local cursor cache, bound to the
 account, exact normalized query and search kind. A cursor expires after ten minutes
 or a restart, and is consumed once on success. The cache holds at most 64 states,
 with at most 50 pages per chain; loops or exhausted bounds return explicit failure.
-Short and empty pages can retain a continuation. Public links come from TDLib;
+Short and empty pages can retain a continuation. A native cursor continues the
+same approved query for free without renewed consent; it cannot authorize a
+new query. Public links come from TDLib;
 message IDs are never transformed into URLs. This operation does not join channels,
 mark messages read, download media or enable sending.
 

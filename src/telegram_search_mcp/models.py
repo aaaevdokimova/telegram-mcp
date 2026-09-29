@@ -135,13 +135,31 @@ class PublicPostRecord(OutputModel):
     public_url: str | None = Field(max_length=2048)
 
 
-class PublicPostSearchResult(OutputModel):
-    trust_boundary: TrustBoundary = Field(default_factory=TrustBoundary)
+class PublicPostSearchQuotaResult(OutputModel):
     searched_scope: Literal["public_channel_posts"] = "public_channel_posts"
     status: Literal["ok", "unavailable", "unsupported_feature", "failed"]
     reason: Literal["free_quota_unavailable", "rate_limited", "premium_required", "account_restricted",
                     "authorization_required", "telegram_refused", "unsupported_feature", "invalid_response",
-                    "pagination_loop", "pagination_bound", "native_timeout"] | None = None
+                    "native_timeout"] | None = None
+    normalized_query: str = Field(min_length=2, max_length=200)
+    search_performed: Literal[False] = False
+    quota: PublicPostSearchQuota | None
+    free_search_available: bool = Field(strict=True)
+    confirmation_token: str | None = Field(default=None, max_length=512)
+    confirmation_expires_in_seconds: int | None = Field(default=None, strict=True, ge=1, le=300)
+    retry_after_seconds: int | None = Field(default=None, strict=True, ge=0, lt=2**31)
+    stars_authorized: Literal[0] = 0
+
+
+class PublicPostSearchResult(OutputModel):
+    trust_boundary: TrustBoundary = Field(default_factory=TrustBoundary)
+    searched_scope: Literal["public_channel_posts"] = "public_channel_posts"
+    status: Literal["ok", "unavailable", "unsupported_feature", "failed", "confirmation_required", "quota_changed"]
+    reason: Literal["free_quota_unavailable", "rate_limited", "premium_required", "account_restricted",
+                    "authorization_required", "telegram_refused", "unsupported_feature", "invalid_response",
+                    "pagination_loop", "pagination_bound", "native_timeout", "explicit_confirmation_required",
+                    "invalid_confirmation_token", "quota_changed"] | None = None
+    normalized_query: str = Field(min_length=2, max_length=200)
     search_performed: bool = Field(strict=True)
     quota: PublicPostSearchQuota | None
     quota_source: Literal["preflight", "post_search", "unavailable"]

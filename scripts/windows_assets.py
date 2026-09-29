@@ -65,7 +65,7 @@ try {
     'plugins/telegram-mcp-work/.codex-plugin/plugin.json': r"""{
   "name": "telegram-mcp-work",
   "version": "@PACKAGE_VERSION@",
-  "description": "Local Telegram history, media and free public posts search for ChatGPT Work on Windows. Each user signs in to their own account.",
+  "description": "Telegram history and media for ChatGPT Work. Public search requires a live free-quota check and explicit permission. Own account required.",
   "author": {
     "name": "prabchevski"
   },
@@ -73,7 +73,7 @@ try {
   "interface": {
     "displayName": "Telegram MCP",
     "shortDescription": "Search your Telegram chats from ChatGPT Work.",
-    "longDescription": "Local Windows Telegram integration. Search chats and public channel posts, read messages and download media. Public posts search can consume Telegram's free search quota and never authorizes a paid search. Sending is disabled until explicitly enabled locally. Requires the Windows installer and your own Telegram login.",
+    "longDescription": "Local Windows Telegram integration. Search account history and subscriptions first, read messages and download media. Before each broader public query, check live free quota, explain remaining attempts and wait for explicit user permission. Never offer Stars payment. Sending is disabled until enabled locally. Requires the Windows installer and your own Telegram login.",
     "developerName": "prabchevski",
     "category": "Productivity",
     "capabilities": [

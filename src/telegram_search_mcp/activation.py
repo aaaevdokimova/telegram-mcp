@@ -59,13 +59,23 @@ def navigation_entry(client: str, wanted: dict) -> dict:
     """Exact 0.8 registration before public posts, including sending preference."""
     result = dict(wanted)
     key = "enabled_tools" if client == "codex" else "includeTools"
-    result[key] = [tool for tool in wanted[key] if tool != "telegram_search_public_posts"]
+    result[key] = [tool for tool in wanted[key] if tool not in {
+        "telegram_search_public_posts", "telegram_get_public_search_quota",
+    }]
     if client == "gemini":
         result["description"] = (
             "Local Telegram history, files, voice, drafts and optional scheduled sending (unofficial)"
             if "telegram_send_message" in result[key]
             else "Local Telegram chat history, files and voice transcription (unofficial)"
         )
+    return result
+
+
+def initial_public_entry(client: str, wanted: dict) -> dict:
+    """Exact 0.9.0 registration, before the quota/consent tool."""
+    result = dict(wanted)
+    key = "enabled_tools" if client == "codex" else "includeTools"
+    result[key] = [tool for tool in wanted[key] if tool != "telegram_get_public_search_quota"]
     return result
 
 
@@ -102,7 +112,8 @@ def migrate(root: Path, *, notify: bool = False) -> dict:
             wanted = expected_entry(client, str(version / ".venv/bin/python"), root)
             if entry == wanted:
                 continue
-            if entry not in (legacy_entry(client, wanted), previous_entry(client, wanted), navigation_entry(client, wanted)):
+            if entry not in (legacy_entry(client, wanted), previous_entry(client, wanted),
+                             navigation_entry(client, wanted), initial_public_entry(client, wanted)):
                 skipped.append(client)
                 continue
             targets[client], snapshots[client] = path, source

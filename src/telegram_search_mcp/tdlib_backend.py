@@ -307,16 +307,35 @@ class TDLibBackend(WorkflowMethods):
         from .public_posts import PublicPostSearch
         self._public_posts = PublicPostSearch()
 
-    async def search_public_posts(self, *, query: str, cursor: str | None, limit: int) -> dict:
-        return await asyncio.to_thread(self._search_public_posts_sync, query=query, cursor=cursor, limit=limit)
+    async def get_public_search_quota(self, *, query: str) -> dict:
+        return await asyncio.to_thread(self._get_public_search_quota_sync, query=query)
 
-    def _search_public_posts_sync(self, *, query: str, cursor: str | None, limit: int) -> dict:
+    def _get_public_search_quota_sync(self, *, query: str) -> dict:
         if SCHEMA is not TdlibSchema.CURRENT:
-            return self._public_posts.search(None, query=query, cursor=cursor, limit=limit, schema=SCHEMA)
+            return self._public_posts.get_public_search_quota(None, query=query, schema=SCHEMA)
+        policy = Policy.load(self.profile)
+        with self._operation_lock:
+            session = self._ready(policy)
+            result = self._public_posts.get_public_search_quota(session, query=query, schema=SCHEMA,
+                                                               timeout=OPERATION_TIMEOUT)
+            self._verify_profile(policy, session)
+            return result
+
+    async def search_public_posts(self, *, query: str, cursor: str | None, limit: int,
+                                  confirmation_token: str | None = None, user_confirmed: bool = False) -> dict:
+        return await asyncio.to_thread(self._search_public_posts_sync, query=query, cursor=cursor, limit=limit,
+                                       confirmation_token=confirmation_token, user_confirmed=user_confirmed)
+
+    def _search_public_posts_sync(self, *, query: str, cursor: str | None, limit: int,
+                                  confirmation_token: str | None = None, user_confirmed: bool = False) -> dict:
+        if SCHEMA is not TdlibSchema.CURRENT:
+            return self._public_posts.search(None, query=query, cursor=cursor, limit=limit, schema=SCHEMA,
+                                            confirmation_token=confirmation_token, user_confirmed=user_confirmed)
         policy = Policy.load(self.profile)
         with self._operation_lock:
             session = self._ready(policy)
             result = self._public_posts.search(session, query=query, cursor=cursor, limit=limit,
+                                               confirmation_token=confirmation_token, user_confirmed=user_confirmed,
                                                schema=SCHEMA, timeout=OPERATION_TIMEOUT)
             self._verify_profile(policy, session)
             return result

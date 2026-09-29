@@ -172,7 +172,7 @@ request starts it again. Restart/reload clients to apply a new registration.
 
 In Codex CLI, inspect `codex mcp get telegram_search`. In Gemini CLI, use
 `gemini mcp list` and `/mcp`; the working directory must be trusted by Gemini.
-Standard MCP discovery exposes 14 tools before authorization, including navigation,
+Standard MCP discovery exposes 15 tools before authorization, including navigation,
 local downloads, voice listing and explicitly requested speech recognition. Opt-in
 sending adds four tools; see README.md, Optional text and file sending.
 
@@ -210,7 +210,7 @@ Official references: [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surfa
 ## Voice recognition and workflow tools
 
 Telegram-native transcription, navigation and local downloads are registered by default:
-14 tools, or 18 when sending is enabled. Stop the idle old service and restart the MCP client
+15 tools, or 19 when sending is enabled. Stop the idle old service and restart the MCP client
 after this upgrade. Apple Silicon uses a locked TDLib wheel; Intel builds pinned
 source once and reuses it. Keep the adopted profile and Keychain in place. Do not
 roll back the native library after it has upgraded the Telegram database.
@@ -219,9 +219,21 @@ See README.md for transcription states and Telegram account limits.
 
 ## Public channel posts
 
-`telegram_search_public_posts` is available independently of sending. Ask:
-«Найди публичные публикации Telegram по теме искусственный интеллект, включая каналы, на которые я не подписан».
-The request can consume free search quota, but always sends `star_count=0` and
-never authorizes a paid search. Quota/access/unsupported outcomes are explicit.
+The agent searches your account history/subscriptions first, then may offer
+`telegram_search_public_posts` beyond your subscriptions. Before each new query,
+it calls the read-only `telegram_get_public_search_quota(query)`, explains the
+remaining free attempts, any wait and whether the query uses an attempt, and asks
+for explicit permission. It must wait for your answer. Limits come from Telegram,
+not a fixed assumed daily allowance. No search attempt is consumed by this check.
+
+The initial search requires the returned `confirmation_token` and
+`user_confirmed=true`. The token is single-use, valid for five minutes and bound
+to the account, query and quota snapshot. A changed quota or expired token means
+a fresh check and confirmation. The server verifies these fields; the agent is
+responsible for collecting the actual human consent. Same-query continuation
+using `next_cursor` is free and needs no new confirmation; a different query does.
+The tool always sends `star_count=0`: no paid search, Stars purchase or paid
+fallback is offered. Quota/access/unsupported outcomes are explicit.
 Restart the client after upgrading so its unchanged standard registration includes
-the new tool. Edited or removed registrations are preserved.
+both new tools. Edited or removed registrations are preserved. This workflow is
+included in MCP instructions for every client, independently of `AGENTS.md`.

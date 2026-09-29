@@ -495,7 +495,7 @@ async def test_two_actual_mcp_stdio_processes_share_service_and_can_exit(private
                 command=sys.executable, args=[helper, "mcp", str(private_paths.directory)])))) for _ in range(2)]
             for client in clients:
                 assert {tool.name for tool in (await client.list_tools()).tools} == {
-                    "telegram_search_messages", "telegram_search_public_posts", "telegram_get_message", "telegram_get_context", "telegram_get_media", "telegram_list_voice_messages", "telegram_transcribe_voice",
+                    "telegram_search_messages", "telegram_search_public_posts", "telegram_get_public_search_quota", "telegram_get_message", "telegram_get_context", "telegram_get_media", "telegram_list_voice_messages", "telegram_transcribe_voice",
                     "telegram_list_chats", "telegram_get_chat_history", "telegram_search_chat_messages",
                     "telegram_download_file", "telegram_get_message_thread", "telegram_get_chat_draft", "telegram_get_scheduled_messages"}
             assert not private_paths.socket.exists(), "MCP initialization must stay lazy"

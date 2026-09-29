@@ -53,7 +53,9 @@ class RawMedia:
 class TelegramBackend(Protocol):
     """The complete interface the MCP process is allowed to call."""
 
-    async def search_public_posts(self, *, query: str, cursor: str | None, limit: int) -> dict: ...
+    async def get_public_search_quota(self, *, query: str) -> dict: ...
+    async def search_public_posts(self, *, query: str, cursor: str | None, limit: int,
+                                  confirmation_token: str | None = None, user_confirmed: bool = False) -> dict: ...
 
     async def search_messages(
         self, *, query: str, cursor: str | None, limit: int

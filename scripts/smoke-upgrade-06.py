@@ -62,7 +62,8 @@ for client, value in receipt['clients'].items():
     tools = entry['enabled_tools' if client == 'codex' else 'includeTools']
     assert {'telegram_list_voice_messages', 'telegram_transcribe_voice'} <= set(tools)
     assert 'telegram_search_public_posts' in tools
-    assert len(tools) == (18 if sys.argv[2] == 'on' else 14)
+    assert 'telegram_get_public_search_quota' in tools
+    assert len(tools) == (19 if sys.argv[2] == 'on' else 15)
     assert (data['model'] if client == 'codex' else data['ui']['theme']) == 'preserved'
 assert len(notifications) == 1
 assert updater.update(root, scheduled=True)['status'] == 'not_due'

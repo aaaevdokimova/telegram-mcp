@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.1 — 2026-09-29
+
+- Add read-only `telegram_get_public_search_quota` to inspect the account's live limits without consuming a public-search attempt. Discovery now has 15 tools by default, or 19 with sending.
+- Require the agent to search account history/subscriptions first, explain the public scope and current free allowance, ask for explicit permission and wait before every new public query. Include this workflow in portable MCP instructions, tool descriptions and installation guides; never assume a fixed daily allowance or offer Stars payment.
+- Gate the initial public search with a five-minute single-use confirmation token bound to the account, query and quota snapshot, plus `user_confirmed=true`. Changed quota requires a fresh check and consent; the flag is the agent's report of human consent. Free native continuation remains within the approved query.
+- Migrate exact standard 0.8/0.9.0 registrations to both public-search tools while preserving removed/customized registrations and sending preferences.
+- Advance the shared-service version so idle older daemons can be replaced before the new quota operation is used.
+
 ## 0.9.0 — 2026-09-29
 
 - Add a native Windows x64 installer and local ChatGPT Work plugin. Immutable program versions and a validated JSON pointer avoid developer-mode symlink requirements.

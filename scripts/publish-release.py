@@ -35,7 +35,7 @@ def current_notes(source: Path, version: str) -> str:
         if expected not in (source / name).read_text():
             raise RuntimeError(f'{name} does not describe the current version')
     changes = sections[0].split('\n', 1)[1].strip()
-    return f'''Telegram MCP for ChatGPT Work on Windows x64 and Codex and Gemini CLI on macOS: chat navigation, unread history, chat search and free public channel posts search, local file downloads, Telegram-native voice/video-note transcription, and optional drafts, replies and scheduled text/document sending. Fourteen tools by default, eighteen with sending enabled. Public posts search can consume Telegram's free search quota; paid searches are never authorized.
+    return f'''Telegram MCP for ChatGPT Work on Windows x64 and Codex and Gemini CLI on macOS: chat navigation, unread history, chat search and free public channel posts search, local file downloads, Telegram-native voice/video-note transcription, and optional drafts, replies and scheduled text/document sending. Fifteen tools by default, nineteen with sending enabled. Search account history first; inspect the account's public-search quota and obtain explicit user confirmation before a new public search. Paid searches are never authorized.
 
 ## Changes in {version}
 

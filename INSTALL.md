@@ -101,13 +101,18 @@ auth; never stop an active operation without coordinating with the owner.
   clients), using the same explicit configuration paths if any.
 - Confirm `current/tgsearch --version` and `current/tgsearch updates status`.
 - Check standard MCP initialization/tool discovery when available: four read-only
-  tools plus navigation, downloads and voice by default (14 total), or 18 with sending, without reading Telegram
-  messages. Registration alone is not a connection test.
+  tools plus navigation, downloads, voice and public quota/search tools by default
+  (15 total), or 19 with sending, without reading Telegram messages. Registration
+  alone is not a connection test.
 - Stop the old shared service once it is idle before connecting the new TDLib.
   Reuse the existing profile in place; do not run an older TDLib against an upgraded database.
 - Restart/reload the selected MCP client to load the new registration. If restarting
   the app would end this conversation, finish the preparation and state that remaining
   user step clearly. Do not claim client integration is live without evidence.
+- Explain the public-search workflow: search account history/subscriptions first,
+  then check live free quota, show remaining attempts and ask for explicit permission
+  before each new public query. A quota check itself does not consume an attempt.
+  Never offer Stars payment. The server passes these instructions to every MCP client.
 - Report the actual installation root, version, saved/new authorization status,
   update mode, verification results, and any remaining restart or owner action.
 

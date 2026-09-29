@@ -51,12 +51,18 @@ results expose the retrieved messages from your account to the selected AI clien
 ## Check the installation
 
 Ask your client: "Find messages in my Telegram containing …" and use a phrase you
-recognize. Six tools are available by default: search, message, context, media,
-voice-message listing, and Telegram-native transcription. You can also ask it to
-transcribe a specific voice message; Telegram's account and quota limits apply.
+recognize. Fifteen tools are available by default: history search, chat navigation,
+media/downloads, voice transcription, and the separate public-search quota and
+search tools. The agent searches your account history/subscriptions first. Before
+any new public search, it checks the live free quota without consuming an attempt,
+explains the cost in free attempts and asks for your permission. It waits for
+your answer; paid Stars search is never offered. See the
+[public-search workflow](README.md#free-public-channel-post-search).
+You can also ask it to transcribe a specific voice message; Telegram's account
+and quota limits apply.
 
 To enable text and document sending, run `current/tgsearch sending on` from the
-printed installation root and restart the clients. This adds four tools, for 18
+printed installation root and restart the clients. This adds four tools, for 19
 in total. Sending requires your explicit instruction; editing/deleting messages
 is not supported. See [sending instructions](README.md#optional-text-and-file-sending).
 

@@ -1,4 +1,4 @@
-# Telegram MCP · 0.9.0
+# Telegram MCP · 0.9.1
 
 Browse and search Telegram chats, download files, transcribe voice messages, and optionally
 save drafts, reply, or schedule text and files with
@@ -36,7 +36,8 @@ See the [quick start](START_HERE.md).
 | Tool | Result |
 | --- | --- |
 | `telegram_search_messages` | Search the linked account's accessible cloud-chat history, up to 20 results per page |
-| `telegram_search_public_posts` | Search public channel posts by text, including channels you have not joined, using only free requests |
+| `telegram_get_public_search_quota` | Check this account's free public-search quota for a query without running a search |
+| `telegram_search_public_posts` | Search public channel posts after a quota check and explicit user confirmation; free requests only |
 | `telegram_get_message` | Retrieve one message by chat and message IDs |
 | `telegram_get_context` | Retrieve up to five supported text or voice/video-note messages on either side of an anchor |
 | `telegram_get_media` | Retrieve a photo, supported audio, PDF, or video thumbnail; previews up to 2 MiB, full media up to 12 MiB |
@@ -87,35 +88,63 @@ is not read-only.
 
 ## Free public channel post search
 
-Use `telegram_search_public_posts(query, cursor?, limit=20)` for public channel
-publications without knowing a channel username or joining it. For example:
-**«Найди публичные публикации Telegram по теме искусственный интеллект, включая каналы, на которые я не подписан».**
+Public channel search extends beyond subscriptions and can use a limited free
+attempt. Start with the account's accessible history/subscriptions using
+`telegram_search_messages`, or one known chat using
+`telegram_search_chat_messages`. Show those results, then offer the broader public
+search if it would help. A general research request or poor results do not authorize
+this expansion automatically.
 
-This is a separate search scope: `telegram_search_messages` searches the account's
-accessible cloud history; `telegram_search_chat_messages` searches one known chat;
-`telegram_search_public_posts` searches Telegram's public channel index. It is not
-an exhaustive search of every Telegram message.
+Before each new public query, the agent must:
 
-Each public search checks `getPublicPostSearchLimits` first and makes at most one
-`searchPublicPosts` request, always with `star_count=0`. There is no payment
-argument, Stars purchase, paid retry or hidden extra page request. A new free
-query can consume a free-quota slot, so the tool is annotated as a non-read-only operation and does not
-claim to be idempotent. Sending need not be enabled.
+1. Call `telegram_get_public_search_quota(query)`. This only checks Telegram's
+   current account limits; it does not run a search or consume a search attempt.
+2. Tell the user the query and broader scope, the remaining free attempts and any
+   wait, and whether this query would use an attempt or is already free/cached.
+   Ask for explicit permission and **wait for the answer**. Never assume a fixed
+   daily allowance; use the live account response.
+3. After permission, pass the quota response's `confirmation_token` and
+   `user_confirmed=true` to `telegram_search_public_posts(query, limit=20, ...)`.
+   If the token expires or the quota snapshot changes, check and ask again.
 
-The result distinguishes `ok`, `unavailable`, `unsupported_feature`, and `failed`
-from a successful zero-match response. Quota fields include
-`remaining_free_query_count`, `next_free_query_in`, `is_current_query_free` and
-`star_count` (informational price only). A quota change between checking and
-searching returns an explicit limit outcome. Telegram's account/access rules
-still apply. An older unsupported TDLib returns `unsupported_feature` and needs an update.
+For example, after searching subscriptions: «В ваших чатах я нашёл эти результаты.
+Могу также поискать публичные публикации по запросу “искусственный интеллект”,
+включая каналы, на которые вы не подписаны. По данным Telegram осталось N
+бесплатных попыток; этот запрос использует одну. Выполнить?» Replace the quota
+statement with the actual result, including when the query is already free or a
+wait is required. Do not offer a paid alternative.
+
+The confirmation token is single-use, expires after five minutes and is bound to
+the account, query and quota snapshot. Missing confirmation never starts a public
+search. The server checks the supplied token and confirmation flag; the agent is
+responsible for truthfully reporting the user's conversational approval. The
+server cannot independently prove that the human answered. MCP initialization
+instructions and tool descriptions carry the workflow to every client, including
+clients that do not read this repository's `AGENTS.md`.
+
+Each call makes at most one `searchPublicPosts` request, always with `star_count=0`.
+There is no payment argument, Stars purchase, paid retry or hidden extra page
+request. Never reformulate or launch a new public query without fresh permission.
+The search tool is non-read-only and non-idempotent because it may consume a free
+attempt; the quota-check tool is read-only. Sending need not be enabled.
+
+Quota fields include `remaining_free_query_count`, `next_free_query_in`,
+`is_current_query_free` and `star_count` (informational price only). A limit race,
+missing confirmation, unsupported TDLib or failed request has an explicit outcome,
+separate from a successful zero-match result. In particular, `confirmation_required`
+means approval is absent or invalid, and `quota_changed` requires a new quota check
+and confirmation. Telegram's account/access rules
+still apply. Public search covers Telegram's public channel index, not every
+Telegram message.
 
 Results contain bounded untrusted text/channel metadata and a public link only
 when confirmed by Telegram. No joining, read-state changes, attachment downloads
-or sending occur. Use `next_cursor` exactly with the same query; short or empty
-pages can still have a continuation. Cursors are bound to the account and search
-kind; they expire after ten minutes or when the shared service restarts. Each cursor
-can be successfully consumed once. Do not interpret a limit,
-partial result or failed request as proof that a post does not exist.
+or sending occur. Use `next_cursor` exactly with the same approved query; these
+free continuation pages need no new confirmation. Short or empty pages can still
+have a continuation. Cursors are bound to the account and search kind, expire
+after ten minutes or a service restart, and can be successfully consumed once.
+Do not interpret a limit, partial result or failed request as proof that a post
+does not exist.
 
 The implementation is shared across platforms; CI covers macOS, Windows and Linux
 core behavior. Packaged desktop installation is provided for macOS and Windows.
@@ -148,8 +177,8 @@ accepted it, the result can remain pending and needs manual checking in Telegram
 Protected, self-destructing, and secret-chat messages are excluded. Text is bounded
 to 32,000 characters, with an explicit truncation flag, and is untrusted content.
 
-The default tool set contains 14 tools; enabling sending makes 18.
-Unchanged standard 0.7/0.8 registrations migrate to the new tools while preserving sending preferences.
+The default tool set contains 15 tools; enabling sending makes 19.
+Unchanged standard 0.7/0.8/0.9.0 registrations migrate to the new tools while preserving sending preferences.
 Existing managed 0.6.1 installations with daily updates enabled transition automatically:
 the old updater installs the new package, then the next scheduled run (or an earlier
 MCP start) adds the current tools to unchanged standard Codex/Gemini registrations.

@@ -103,6 +103,7 @@ jobs:
           tests/test_runtime_storage.py
           tests/test_public_posts.py
           tests/test_public_posts_safety.py
+          tests/test_public_search_consent.py
           tests/test_navigation.py
           tests/test_server.py
           tests/test_speech.py

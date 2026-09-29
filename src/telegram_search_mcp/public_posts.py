@@ -14,13 +14,23 @@ import secrets
 import time
 from urllib.parse import urlsplit
 
-from .models import PublicPostRecord, PublicPostSearchQuota, PublicPostSearchResult, UntrustedText
+from .models import PublicPostRecord, PublicPostSearchQuota, PublicPostSearchQuotaResult, PublicPostSearchResult, UntrustedText
 from .tdjson import TdApi, TdlibError, TdlibSchema
 
 CURSOR_TTL = 600.0
 CURSOR_LIMIT = 64
 MAX_PAGES = 50
 MAX_NATIVE_OFFSET = 4096
+CONFIRMATION_TTL = 300.0
+CONFIRMATION_LIMIT = 64
+
+
+@dataclass(frozen=True)
+class ConfirmationState:
+    account_id: int
+    query: str
+    quota: PublicPostSearchQuota
+    expires: float
 
 
 @dataclass(frozen=True)
@@ -89,6 +99,75 @@ class PublicPostSearch:
 
     def __init__(self) -> None:
         self.cursors: OrderedDict[str, CursorState] = OrderedDict()
+        self.confirmations: OrderedDict[str, ConfirmationState] = OrderedDict()
+
+    @staticmethod
+    def _query(query: str) -> str:
+        if not isinstance(query, str) or not 2 <= len(query.strip()) <= 200:
+            raise ValueError("Invalid public-post query bounds")
+        return query.strip()
+
+    @staticmethod
+    def _account(session) -> int:
+        if type(session.user_id) is not int or session.user_id <= 0:
+            raise ValueError("A verified Telegram account is required")
+        return session.user_id
+
+    @staticmethod
+    def _free(quota: PublicPostSearchQuota) -> bool:
+        return quota.is_current_query_free or (
+            quota.remaining_free_query_count > 0 and quota.next_free_query_in == 0)
+
+    @classmethod
+    def _same_free_terms(cls, before: PublicPostSearchQuota, after: PublicPostSearchQuota) -> bool:
+        # The wait naturally counts down while the user considers consent, and
+        # an informational paid price is irrelevant to this free-only workflow.
+        return (before.daily_free_query_count == after.daily_free_query_count
+                and before.remaining_free_query_count == after.remaining_free_query_count
+                and before.is_current_query_free == after.is_current_query_free
+                and cls._free(before) == cls._free(after))
+
+    def _expire_confirmations(self) -> None:
+        now = time.monotonic()
+        for token in list(self.confirmations):
+            if self.confirmations[token].expires <= now:
+                del self.confirmations[token]
+
+    def get_public_search_quota(self, session, *, query: str,
+                                schema: TdlibSchema = TdlibSchema.CURRENT, timeout: float = 50.0) -> dict:
+        """Read Telegram's actual quota and prepare, but never execute, a search.
+
+        A token proves that this exact account/query's quota was checked. The
+        caller must disclose it and obtain explicit conversational consent.
+        """
+        query = self._query(query)
+        result = dict(status="ok", reason=None, normalized_query=query, quota=None,
+                      free_search_available=False)
+        def output(**changes):
+            return PublicPostSearchQuotaResult.model_validate({**result, **changes}).model_dump(mode="json")
+        if schema is not TdlibSchema.CURRENT:
+            return output(status="unsupported_feature", reason="unsupported_feature")
+        account = self._account(session)
+        self._expire_confirmations()
+        try:
+            quota = _quota(session.request(TdApi(schema).get_public_post_search_limits(query), timeout=min(timeout, 15)))
+            result.update(quota=quota, free_search_available=self._free(quota))
+            if not self._free(quota):
+                return output(status="unavailable", reason="free_quota_unavailable",
+                              retry_after_seconds=quota.next_free_query_in or None)
+            token = "public-confirm:" + secrets.token_hex(24)
+            self.confirmations[token] = ConfirmationState(account, query, quota.model_copy(deep=True),
+                                                          time.monotonic() + CONFIRMATION_TTL)
+            while len(self.confirmations) > CONFIRMATION_LIMIT:
+                self.confirmations.popitem(last=False)
+            return output(confirmation_token=token, confirmation_expires_in_seconds=int(CONFIRMATION_TTL))
+        except TdlibError as exc:
+            status, reason, wait = _failure(exc)
+            return output(status=status, reason=reason, retry_after_seconds=wait)
+        except TimeoutError:
+            return output(status="failed", reason="native_timeout")
+        except (ValueError, TypeError, KeyError, AttributeError, OverflowError, OSError):
+            return output(status="failed", reason="invalid_response")
 
     def _cursor(self, token: str | None, query: str, account: int) -> CursorState:
         now = time.monotonic()
@@ -111,21 +190,33 @@ class PublicPostSearch:
         return token
 
     def search(self, session, *, query: str, cursor: str | None = None, limit: int = 20,
+               confirmation_token: str | None = None, user_confirmed: bool = False,
                schema: TdlibSchema = TdlibSchema.CURRENT, timeout: float = 50.0) -> dict:
-        if (not isinstance(query, str) or not 2 <= len(query.strip()) <= 200
-                or type(limit) is not int or not 1 <= limit <= 20
-                or (cursor is not None and (not isinstance(cursor, str) or not 8 <= len(cursor) <= 512))):
+        query = self._query(query)
+        if (type(limit) is not int or not 1 <= limit <= 20 or type(user_confirmed) is not bool
+                or (cursor is not None and (not isinstance(cursor, str) or not 8 <= len(cursor) <= 512))
+                or (confirmation_token is not None and (not isinstance(confirmation_token, str)
+                                                       or not 8 <= len(confirmation_token) <= 512))):
             raise ValueError("Invalid public-post search bounds")
-        query = query.strip()
-        result = dict(status="ok", reason=None, search_performed=False, quota=None, quota_source="unavailable",
+        result = dict(status="ok", reason=None, normalized_query=query, search_performed=False, quota=None, quota_source="unavailable",
                       items=[], count=0, requested_limit=limit, next_cursor=None)
         def output(**changes):
             return PublicPostSearchResult.model_validate({**result, **changes}).model_dump(mode="json")
         if schema is not TdlibSchema.CURRENT:
             return output(status="unsupported_feature", reason="unsupported_feature")
-        if type(session.user_id) is not int or session.user_id <= 0:
-            raise ValueError("A verified Telegram account is required")
-        state = self._cursor(cursor, query, session.user_id)
+        account = self._account(session)
+        state = self._cursor(cursor, query, account)
+        confirmation = None
+        if cursor is None:
+            if not user_confirmed or confirmation_token is None:
+                return output(status="confirmation_required", reason="explicit_confirmation_required")
+            self._expire_confirmations()
+            confirmation = self.confirmations.get(confirmation_token)
+            if confirmation is None or confirmation.account_id != account or confirmation.query != query:
+                return output(status="confirmation_required", reason="invalid_confirmation_token")
+            # Consume before any new native request. A timeout, refused search or
+            # changed snapshot must never allow an automatic replay of consent.
+            del self.confirmations[confirmation_token]
         deadline = time.monotonic() + timeout
         def remaining(cap=10.0):
             left = deadline - time.monotonic()
@@ -136,11 +227,13 @@ class PublicPostSearch:
         try:
             quota = _quota(session.request(api.get_public_post_search_limits(query), timeout=remaining(15)))
             result.update(quota=quota, quota_source="preflight")
+            if confirmation is not None and not self._same_free_terms(confirmation.quota, quota):
+                return output(status="quota_changed", reason="quota_changed",
+                              retry_after_seconds=quota.next_free_query_in or None)
             # Successful native continuations are free by contract. The cursor
             # proves the query/account already succeeded; it is not an offset
             # supplied by a model attempting to bypass a quota check.
-            free = bool(state.offset) or quota.is_current_query_free or (
-                quota.remaining_free_query_count > 0 and quota.next_free_query_in == 0)
+            free = bool(state.offset) or self._free(quota)
             if not free:
                 return output(status="unavailable", reason="free_quota_unavailable",
                               retry_after_seconds=quota.next_free_query_in or None)

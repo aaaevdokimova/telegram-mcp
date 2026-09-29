@@ -14,4 +14,5 @@ DEFAULT_TOOLS = (
     "telegram_get_chat_draft",
     "telegram_get_scheduled_messages",
     "telegram_search_public_posts",
+    "telegram_get_public_search_quota",
 )
