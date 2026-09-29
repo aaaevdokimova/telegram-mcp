@@ -1,5 +1,11 @@
 # Verification
 
+## Version 0.9.0 — Windows portability
+
+Source baseline: remote main `9652983` (0.8.0). The unmodified baseline passed 308 tests on macOS. Changes add Windows ACL/locking/credential tests, mutually authenticated loopback transport tests, plugin registration preservation tests, and a Windows x64 CI job. The installer smoke check uses temporary program and marketplace directories, verifies the pinned native DLL, performs two immutable installations, and checks MCP discovery with 13/17/13 tools without authorizing Telegram or invoking a Telegram tool.
+
+Verification status is recorded in the change's CI results. A successful automated run does not establish that a real Windows ChatGPT Work UI has installed the plugin or that a user's Telegram account has authorized successfully. Those two acceptance steps remain with the Windows user. This work never changes a developer's real profile, Keychain/Credential Manager entries, or client settings.
+
 ## Version 0.8.0 — September 16, 2026
 
 - Local result: 308 tests passed on Apple Silicon macOS / Python 3.13.

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from .paths import ensure_private_dir
+from .platform_support import open_owned_readonly, open_private_file, fsync_directory
 from .policy import _assert_private_file, _atomic_private_json
 from .tdjson import TdlibError
 
@@ -102,11 +103,7 @@ class Outbox:
         folder = self.directory / value["draft_id"]
         _atomic_private_json(folder / "state.json", value)
         # Persist the rename, not just the file contents, before an external send.
-        fd = os.open(folder, os.O_RDONLY)
-        try:
-            os.fsync(fd)
-        finally:
-            os.close(fd)
+        fsync_directory(folder)
 
     @staticmethod
     def public(value: dict) -> dict:
@@ -163,7 +160,7 @@ class Outbox:
             if unfinished >= 32:
                 raise ValueError("Too many unfinished outgoing drafts; review the local outbox")
             folder = self.directory / draft_id
-            folder.mkdir(mode=0o700)
+            ensure_private_dir(folder)
             try:
                 value = {"draft_id": draft_id, "user_id": self.user_id, "status": "prepared", "spec": spec,
                          "chat_id": int(chat["id"]), "chat_title": str(chat.get("title", ""))[:256],
@@ -174,14 +171,17 @@ class Outbox:
                     path = Path(file_path)
                     if path.resolve() != path or path.name == "state.json" or len(path.name.encode()) > 200:
                         raise ValueError("File must not traverse symlinks and must have a safe filename")
-                    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                    try:
+                        fd = open_owned_readonly(path)
+                    except RuntimeError as exc:
+                        raise ValueError("Attachment must be a regular file owned by the current user") from exc
                     with os.fdopen(fd, "rb") as source:
                         info = os.fstat(source.fileno())
                         if not stat.S_ISREG(info.st_mode) or not 1 <= info.st_size <= MAX_FILE_BYTES:
                             raise ValueError("Attachment must be a nonempty regular file up to 12 MiB")
                         digest = hashlib.sha256()
                         size = 0
-                        target_fd = os.open(folder / path.name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                        target_fd = open_private_file(folder / path.name, exclusive=True)
                         with os.fdopen(target_fd, "wb") as target:
                             while chunk := source.read(65536):
                                 size += len(chunk)
@@ -196,11 +196,7 @@ class Outbox:
                             raise ValueError("Attachment changed while preparing; prepare it again")
                     value.update(file_name=path.name, file_size=size, file_sha256=digest.hexdigest())
                 self._save(value)
-                parent_fd = os.open(self.directory, os.O_RDONLY)
-                try:
-                    os.fsync(parent_fd)
-                finally:
-                    os.close(parent_fd)
+                fsync_directory(self.directory)
                 return self.public(value)
             except BaseException:
                 shutil.rmtree(folder)

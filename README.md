@@ -1,10 +1,16 @@
-# Telegram MCP · 0.8.0
+# Telegram MCP · 0.9.0
 
 Browse and search Telegram chats, download files, transcribe voice messages, and optionally
 save drafts, reply, or schedule text and files with
-**Codex and Gemini CLI on macOS**.
+**ChatGPT Work on Windows x64** and **Codex and Gemini CLI on macOS**.
 One installation and one Telegram login serve both clients at the same time.
 This is an unofficial project. Gemini's web and mobile apps are not supported.
+
+## ChatGPT Work on Windows
+
+Native Windows x64 support is available through a local desktop plugin. Download or clone this source, then run `install-windows.ps1` in 64-bit PowerShell. The installer downloads a checksum-pinned uv runtime, installs Python 3.13 and locked dependencies, verifies TDLib, and adds Telegram MCP to your personal plugin marketplace. Sign in to **your own** Telegram account locally, restart ChatGPT, then install **Telegram MCP** from **Plugins → Personal** in Work.
+
+See [the Windows guide](INSTALL_WINDOWS.md) for the exact command, prerequisites, updates, sending, and removal. No WSL, public MCP endpoint, or tunnel is required. Windows updates are manual in this release. Native Windows ARM64 and ChatGPT web are outside this installation path. End-to-end use inside Windows ChatGPT still requires a user acceptance check; automated checks cover the native runtime, isolated installation and MCP transport.
 
 ## Install with Codex or Gemini CLI
 
@@ -285,7 +291,7 @@ uv run --frozen python -I scripts/release.py build --output dist
 ```
 
 Tests use isolated profiles and settings and do not require a Telegram account.
-CI tests Linux/macOS and builds and installs an allowlisted source archive on a
+CI tests Linux/macOS and native Windows x64, and builds and installs an allowlisted source archive on a
 GitHub-hosted Mac. This is a test environment, not the maintainer's or users' Macs.
 After these checks pass on main, CI publishes each new package version to
 [GitHub Releases](https://github.com/prabchevski/telegram-mcp/releases/latest), with

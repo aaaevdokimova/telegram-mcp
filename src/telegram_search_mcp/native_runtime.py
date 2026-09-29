@@ -4,16 +4,21 @@ from __future__ import annotations
 from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 import ctypes
-import fcntl
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
+import sys
 import tempfile
+import threading
 
 VERSION = "1.8.67"
 COMMIT = "d1085f9cebc5a62379991ae1652673954f229c1f"
+IS_WINDOWS = sys.platform == "win32"
+_dll_directories: dict[Path, object] = {}
+_dll_directory_lock = threading.Lock()
 
 
 def bundled_candidates() -> list[Path]:
@@ -24,7 +29,34 @@ def bundled_candidates() -> list[Path]:
     if package.version != VERSION:
         raise RuntimeError("Unexpected bundled TDLib package version")
     return [Path(package.locate_file(item)) for item in package.files or ()
-            if item.name.startswith("libtdjson") and (".so" in item.name or item.name.endswith(".dylib"))]
+            if (item.name.startswith("libtdjson") and (".so" in item.name or item.name.endswith(".dylib")))
+            or item.name in {"tdjson.dll", "libtdjson.dll"}
+            or (item.parent.name == "tdjson.libs" and re.fullmatch(r"tdjson-[0-9a-f]{32}\.dll", item.name))]
+
+
+def load_library(path: Path) -> ctypes.CDLL:
+    """Load the pinned library with its wheel's Windows DLL dependencies.
+
+    Delvewheel places the Windows library and renamed dependency DLLs together
+    in tdjson.libs. Register only that resolved directory, never PATH or a
+    workspace environment variable. Keep successful registration handles alive
+    for the process lifetime so delayed native loads use the same directory.
+    """
+    if not IS_WINDOWS:
+        return ctypes.CDLL(str(path))
+    path = path.resolve()
+    directory = path.parent
+    with _dll_directory_lock:
+        if directory in _dll_directories:
+            return ctypes.CDLL(str(path))
+        handle = os.add_dll_directory(str(directory))
+        try:
+            library = ctypes.CDLL(str(path))
+        except BaseException:
+            handle.close()
+            raise
+        _dll_directories[directory] = handle
+        return library
 
 
 def candidates() -> list[Path]:
@@ -71,7 +103,7 @@ def start_background_prepare(root: Path) -> None:
 
 
 def verify(path: Path) -> None:
-    library = ctypes.CDLL(str(path))
+    library = load_library(path)
     library.td_execute.argtypes = [ctypes.c_char_p]
     library.td_execute.restype = ctypes.c_char_p
     for name, expected in (("version", VERSION), ("commit_hash", COMMIT)):
@@ -108,6 +140,7 @@ def _build_cache(root: Path) -> Path:
 
 
 def prepare_cache(root: Path, *, background: bool = False) -> Path | None:
+    import fcntl  # Only the Intel macOS source-build path uses flock.
     from telegram_search_mcp.config_io import validate_path
     from telegram_search_mcp.launchers import validate_root
     from telegram_search_mcp.service import open_private_file

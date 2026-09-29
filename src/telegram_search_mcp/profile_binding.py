@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import json
 import os
 from pathlib import Path
-import stat
-import tempfile
+
+from .platform_support import (IS_WINDOWS, local_data_dir, assert_private_path, acquire_file_lock, secure_file, replace_private_file, private_temp_file)
 
 SHARED_APP = "TelegramSearchMCPShared"
 SHARED_SERVICE = "local.unofficial-telegram-search-mcp-shared"
@@ -18,20 +17,13 @@ LEGACY = {
 
 
 def shared_root() -> Path:
+    if IS_WINDOWS:
+        return local_data_dir() / SHARED_APP
     return Path.home() / "Library" / "Application Support" / SHARED_APP
 
 
 def _private(path: Path, *, directory: bool = False) -> None:
-    if not path.is_absolute() or path.resolve() != path:
-        raise RuntimeError("Profile paths must be absolute and must not traverse symlinks")
-    info = path.lstat()
-    if info.st_uid != os.getuid() or info.st_mode & 0o077:
-        raise RuntimeError("Profile data must be private to the current user")
-    if directory:
-        if not stat.S_ISDIR(info.st_mode):
-            raise RuntimeError("Expected a private profile directory")
-    elif not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-        raise RuntimeError("Expected a private regular profile file")
+    assert_private_path(path, directory=directory)
 
 
 def read_binding() -> str | None:
@@ -39,6 +31,8 @@ def read_binding() -> str | None:
     if not path.exists() and not path.is_symlink():
         return None
     _private(path)
+    if IS_WINDOWS:
+        raise RuntimeError("Legacy macOS profile bindings cannot be used on Windows; authorize a new local profile")
     if path.stat().st_size > 1024:
         raise RuntimeError("Invalid profile binding")
     data = json.loads(path.read_text())
@@ -62,6 +56,8 @@ def credential_services() -> tuple[str, ...]:
 
 
 def inspect_legacy(source: str) -> dict | None:
+    if IS_WINDOWS:
+        return None
     root = shared_root().parent / LEGACY[source][0]
     profile = root / "profiles" / "default"
     policy = profile / "policy.json"
@@ -117,7 +113,7 @@ def adopt(source: str) -> None:
     fd = open_private_file(shared_root() / "profile-migration.lock")
     try:
         try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            acquire_file_lock(fd)
         except BlockingIOError as exc:
             raise RuntimeError("Another profile migration is in progress; retry later") from exc
         if read_binding() == source:
@@ -131,7 +127,7 @@ def adopt(source: str) -> None:
             legacy_fd = open_private_file(lock)
             try:
                 try:
-                    fcntl.flock(legacy_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    acquire_file_lock(legacy_fd)
                 except BlockingIOError as exc:
                     raise RuntimeError("The old Telegram profile is in use. Restart/close its MCP clients and retry; no session was copied or stopped") from exc
                 # All runtime lookups subsequently use this exact fixed namespace.
@@ -139,14 +135,15 @@ def adopt(source: str) -> None:
                 target = shared_root() / "profile-source.json"
                 if target.exists() or target.is_symlink():
                     raise RuntimeError("Profile binding changed during migration")
-                descriptor, name = tempfile.mkstemp(prefix=".profile-source-", dir=shared_root())
+                descriptor, name = private_temp_file(shared_root(), prefix=".profile-source-")
                 try:
                     with os.fdopen(descriptor, "w") as output:
                         json.dump({"schema": 1, "source": source}, output)
                         output.write("\n")
                         output.flush()
                         os.fsync(output.fileno())
-                    os.replace(name, target)
+                    secure_file(Path(name))
+                    replace_private_file(Path(name), target)
                 finally:
                     with contextlib.suppress(FileNotFoundError):
                         os.unlink(name)

@@ -1,4 +1,4 @@
-"""One private Unix-socket service owns each profile's TDLib session.
+"""One private local service owns each profile's TDLib session.
 
 Caller timeouts never cancel native work. The queue worker awaits the actual
 backend call before starting another operation or closing the database.
@@ -9,7 +9,6 @@ import argparse
 import asyncio
 import contextlib
 import ctypes
-import fcntl
 import hashlib
 import os
 import signal
@@ -18,13 +17,15 @@ import stat
 import struct
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, Literal
 
 from . import __version__
 from .backend import MediaError, TelegramBackend
 from .paths import ensure_private_dir, profile_root
+from .platform_support import IS_WINDOWS, acquire_file_lock, local_data_dir
+from .platform_support import open_private_file as _open_private_file
 from .wire import (
     MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, PROTOCOL_VERSION,
     ServiceBusyError, ServiceError, ServiceProtocolError, ServiceStoppingError,
@@ -41,6 +42,15 @@ WRITE_TIMEOUT = 10.0
 @dataclass(frozen=True)
 class ServicePaths:
     directory: Path
+    transport: Literal["unix", "tcp"] = field(default_factory=lambda: "tcp" if IS_WINDOWS else "unix")
+
+    def __post_init__(self) -> None:
+        if self.transport not in {"unix", "tcp"}:
+            raise ValueError("Invalid local service transport")
+
+    @property
+    def endpoint(self) -> Path:
+        return self.directory / "service.json"
 
     @property
     def socket(self) -> Path:
@@ -64,6 +74,8 @@ def service_paths(profile: str = "default") -> ServicePaths:
     # both that limit and redirection through inherited TMPDIR/workspace .env.
     identity = str(profile_root(profile))
     digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
+    if IS_WINDOWS:
+        return ServicePaths(local_data_dir() / "TelegramMCP" / "services" / digest)
     base = Path("/private/tmp" if sys.platform == "darwin" else "/tmp")
     return ServicePaths(base / f"tgsearch-{os.getuid()}" / digest)
 
@@ -71,11 +83,16 @@ def service_paths(profile: str = "default") -> ServicePaths:
 def prepare_service_paths(paths: ServicePaths) -> None:
     ensure_private_dir(paths.directory.parent)
     ensure_private_dir(paths.directory)
-    if len(os.fsencode(paths.socket)) > 103:
+    if paths.transport == "unix" and len(os.fsencode(paths.socket)) > 103:
         raise ServiceError("Local service socket path is too long")
 
 
 def open_private_file(path: Path) -> int:
+    if IS_WINDOWS:
+        try:
+            return _open_private_file(path)
+        except RuntimeError as exc:
+            raise ServiceError("Unsafe local service file") from exc
     flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
     fd = os.open(path, flags, 0o600)
     try:
@@ -101,7 +118,7 @@ def profile_exclusive(profile: str = "default", *, paths: ServicePaths | None = 
     fd = open_private_file(paths.lock)
     try:
         try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            acquire_file_lock(fd)
         except BlockingIOError as exc:
             raise ServiceBusyError(
                 "Telegram profile has an active service or authorization. "
@@ -120,7 +137,7 @@ def service_lock_held(paths: ServicePaths) -> bool:
     fd = open_private_file(paths.lock)
     try:
         try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            acquire_file_lock(fd)
         except BlockingIOError:
             return True
         return False
@@ -199,6 +216,7 @@ class LocalService:
         self.connections: set[asyncio.Task[Any]] = set()
         self.writers: set[asyncio.StreamWriter] = set()
         self._socket_inode: int | None = None
+        self._endpoint = None
 
     def status(self) -> dict[str, Any]:
         return {"running": True, "stopping": self.stopping.is_set(), "busy": self.active,
@@ -210,14 +228,31 @@ class LocalService:
 
     async def run(self) -> None:
         with profile_exclusive(self.profile, paths=self.paths):
-            _safe_unlink_socket(self.paths.socket)
-            previous_umask = os.umask(0o077)
-            try:
-                server = await asyncio.start_unix_server(self._handle, path=str(self.paths.socket), limit=MAX_REQUEST_BYTES + 4)
-            finally:
-                os.umask(previous_umask)
-            self.paths.socket.chmod(0o600)
-            self._socket_inode = self.paths.socket.stat().st_ino
+            if self.paths.transport == "tcp":
+                from .windows_transport import Endpoint, listener_socket, publish_endpoint
+                import secrets
+                listener = listener_socket()
+                self._endpoint = Endpoint(listener.getsockname()[1], secrets.token_bytes(32))
+                try:
+                    server = await asyncio.start_server(self._handle, sock=listener, limit=MAX_REQUEST_BYTES + 4)
+                except BaseException:
+                    listener.close()
+                    raise
+                try:
+                    publish_endpoint(self.paths.endpoint, self._endpoint)
+                except BaseException:
+                    server.close()
+                    await server.wait_closed()
+                    raise
+            else:
+                _safe_unlink_socket(self.paths.socket)
+                previous_umask = os.umask(0o077)
+                try:
+                    server = await asyncio.start_unix_server(self._handle, path=str(self.paths.socket), limit=MAX_REQUEST_BYTES + 4)
+                finally:
+                    os.umask(previous_umask)
+                self.paths.socket.chmod(0o600)
+                self._socket_inode = self.paths.socket.stat().st_ino
             worker = asyncio.create_task(self._worker(), name="telegram-service-worker")
             idle = asyncio.create_task(self._idle(), name="telegram-service-idle")
             self.ready.set()
@@ -252,7 +287,11 @@ class LocalService:
                         for task in pending_tasks:
                             task.cancel()
                         await asyncio.gather(*pending_tasks, return_exceptions=True)
-                    _safe_unlink_socket(self.paths.socket, self._socket_inode)
+                    if self.paths.transport == "tcp":
+                        from .windows_transport import remove_endpoint
+                        remove_endpoint(self.paths.endpoint, self._endpoint)
+                    else:
+                        _safe_unlink_socket(self.paths.socket, self._socket_inode)
 
     async def _idle(self) -> None:
         while not self.stopping.is_set():
@@ -314,8 +353,15 @@ class LocalService:
         disconnected: asyncio.Task[Any] | None = None
         request_id: str | None = None
         should_stop = False
+        authenticated = False
         try:
-            require_same_user(writer.get_extra_info("socket"))
+            if self.paths.transport == "tcp":
+                from .windows_transport import authenticate_server
+                assert self._endpoint is not None
+                await authenticate_server(reader, writer, self._endpoint.secret)
+            else:
+                require_same_user(writer.get_extra_info("socket"))
+            authenticated = True
             async with asyncio.timeout(FRAME_TIMEOUT):
                 request = validate_request(await read_frame(reader, MAX_REQUEST_BYTES))
             request_id = request["id"]
@@ -349,8 +395,9 @@ class LocalService:
         except (ConnectionError, asyncio.IncompleteReadError, BrokenPipeError):
             pass
         except Exception as exc:
-            with contextlib.suppress(ConnectionError, OSError, TimeoutError, ServiceError):
-                await self._respond(writer, request_id, {"error": error_result(exc)})
+            if authenticated:
+                with contextlib.suppress(ConnectionError, OSError, TimeoutError, ServiceError):
+                    await self._respond(writer, request_id, {"error": error_result(exc)})
         finally:
             if should_stop:
                 self.request_stop()
@@ -375,9 +422,19 @@ async def _run(profile: str) -> None:
 
     service = LocalService(TDLibBackend(profile), profile=profile)
     loop = asyncio.get_running_loop()
+    previous = {}
     for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, service.request_stop)
-    await service.run()
+        if IS_WINDOWS:
+            # ProactorEventLoop has no add_signal_handler. The stdlib invokes
+            # signal handlers on the main thread; schedule the same drain path.
+            previous[sig] = signal.signal(sig, lambda *_: loop.call_soon_threadsafe(service.request_stop))
+        else:
+            loop.add_signal_handler(sig, service.request_stop)
+    try:
+        await service.run()
+    finally:
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
 
 
 def main() -> None:

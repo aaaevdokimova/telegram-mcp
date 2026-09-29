@@ -77,8 +77,51 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  windows-install:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: '0.11.15'
+          enable-cache: false
+          python-version: '3.13'
+      - name: Install locked native Windows dependencies
+        run: uv sync --locked --python 3.13
+      - name: Windows security, shared service, and portable core checks
+        # The existing macOS registration/service tests deliberately exercise POSIX APIs.
+        run: >-
+          uv run --frozen pytest
+          tests/test_platform_support.py
+          tests/test_windows_credentials.py
+          tests/test_windows_service.py
+          tests/test_windows_install.py
+          tests/test_windows_native_runtime.py
+          tests/test_runtime_storage.py
+          tests/test_navigation.py
+          tests/test_server.py
+          tests/test_speech.py
+          tests/test_tdjson.py
+          tests/test_cli.py
+          tests/test_codex_config.py
+          tests/test_native_runtime.py::test_pinned_native_library_version_and_recognition_parser
+          tests/test_native_runtime.py::test_runtime_rejects_library_outside_pinned_build
+      - name: Build and audit the source archive
+        run: |
+          uv run --frozen python -I scripts/release.py audit
+          uv run --frozen python -I scripts/release.py build --output dist
+      - name: Verify actual Windows archive installation and plugin discovery
+        run: |
+          $archives = @(Get-ChildItem -LiteralPath dist -Filter '*.zip')
+          if ($archives.Count -ne 1) { throw 'Expected exactly one source release archive' }
+          $archive = $archives[0].FullName
+          uv run --frozen python -I scripts/smoke-install-windows.py $archive
+
   publish-release:
-    needs: release-artifacts
+    needs: [release-artifacts, windows-install]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'prabchevski/telegram-mcp'
     runs-on: ubuntu-latest
     timeout-minutes: 5

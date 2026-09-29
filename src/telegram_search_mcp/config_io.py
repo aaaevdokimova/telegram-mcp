@@ -4,10 +4,22 @@ from __future__ import annotations
 import os
 import stat
 import tempfile
+import uuid
 from pathlib import Path
 
 
 def validate_path(path: Path) -> None:
+    if os.name == "nt":
+        from .platform_support import assert_safe_path
+        if not path.is_absolute():
+            raise RuntimeError("Configuration path must be absolute")
+        ancestor = path.parent
+        while not ancestor.exists():
+            ancestor = ancestor.parent
+        assert_safe_path(ancestor, directory=True)
+        if path.exists() or path.is_symlink():
+            assert_safe_path(path)
+        return
     if not path.is_absolute():
         raise RuntimeError("Configuration path must be absolute")
     if path.is_symlink() or path.parent.is_symlink():
@@ -33,6 +45,14 @@ def read_source(path: Path) -> bytes | None:
     return path.read_bytes() if path.exists() else None
 
 
+def _temporary(parent: Path, prefix: str) -> tuple[int, str]:
+    if os.name == "nt":
+        from .platform_support import open_private_file
+        path = parent / (prefix + uuid.uuid4().hex)
+        return open_private_file(path, exclusive=True), str(path)
+    return tempfile.mkstemp(prefix=prefix, dir=parent)
+
+
 def atomic_write(path: Path, content: bytes, *, expected: bytes | None) -> Path | None:
     """Compare with the inspected source, then keep a private byte-exact backup."""
     if read_source(path) != expected:
@@ -40,14 +60,20 @@ def atomic_write(path: Path, content: bytes, *, expected: bytes | None) -> Path 
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     backup = None
     if expected is not None:
-        descriptor, name = tempfile.mkstemp(prefix=path.name + ".telegram-search-backup-", dir=path.parent)
+        descriptor, name = _temporary(path.parent, path.name + ".telegram-search-backup-")
         backup = Path(name)
+        if os.name == "nt":
+            from .platform_support import secure_file
+            secure_file(backup)
         with os.fdopen(descriptor, "wb") as output:
             output.write(expected)
             output.flush()
             os.fsync(output.fileno())
-    descriptor, name = tempfile.mkstemp(prefix=".telegram-search-", dir=path.parent)
+    descriptor, name = _temporary(path.parent, ".telegram-search-")
     temporary = Path(name)
+    if os.name == "nt":
+        from .platform_support import secure_file
+        secure_file(temporary)
     try:
         with os.fdopen(descriptor, "wb") as output:
             output.write(content)

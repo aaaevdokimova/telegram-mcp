@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from types import SimpleNamespace
 import pytest
 
-from telegram_search_mcp import keychain
+from telegram_search_mcp import keychain, profile_binding
+
+pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="macOS Keychain adapter; Credential Manager has separate tests")
 
 
 @pytest.fixture(autouse=True)
 def isolated_profile_binding(monkeypatch, tmp_path):
     # Never inspect the developer's migrated Keychain namespace in unit tests.
-    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(profile_binding, "shared_root", lambda: tmp_path / "shared")
 
 
 def test_set_secret_uses_detached_stdin_and_never_argv(monkeypatch) -> None:

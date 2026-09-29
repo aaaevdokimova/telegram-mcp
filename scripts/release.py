@@ -30,7 +30,7 @@ REQUIRED_FILES = frozenset(
      "scripts/install.py", "src/telegram_search_mcp/__init__.py"}
 )
 ROOT_FILES = REQUIRED_FILES | {
-    ".gitignore", "NOTICE", "update-macos.command", "uninstall-macos.command"
+    ".gitignore", "NOTICE", "update-macos.command", "uninstall-macos.command", "install-windows.ps1"
 }
 FORBIDDEN_PARTS = frozenset(
     {"profiles", "runtime", "database", "files", "secrets", "credentials", ".ssh",
@@ -63,6 +63,8 @@ def allowed_path(name: str) -> bool:
     if path.parts[0] == "tests" and path.suffix == ".py":
         return path.name.startswith("test_") or path.name in {"conftest.py", "__init__.py"}
     if path.parts[0] == "scripts" and path.suffix in {".sh", ".py"}:
+        return True
+    if name in {"plugins/telegram-mcp-work/.codex-plugin/plugin.json", "plugins/telegram-mcp-work/.mcp.json"}:
         return True
     return path.parts[:2] == (".github", "workflows") and path.suffix in {".yml", ".yaml"}
 

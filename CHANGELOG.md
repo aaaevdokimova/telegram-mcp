@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0 — 2026-09-29
+
+- Add a native Windows x64 installer and local ChatGPT Work plugin. Immutable program versions and a validated JSON pointer avoid developer-mode symlink requirements.
+- Use Windows Credential Manager, per-user protected filesystem ACLs and native file locks. Each user authorizes their own account; no session or secrets ship with the source.
+- Retain one shared TDLib owner on Windows, using authenticated loopback transport, bounded requests and graceful draining. Unix socket behavior remains on macOS/Linux.
+- Discover and verify the pinned Windows TDLib DLL. Add native Windows CI and isolated installer/MCP-discovery checks; default 13 tools and optional 17 tools remain unchanged.
+- Preserve other marketplace entries and user-edited/removed plugin registration during updates. Windows updates are manual; macOS updates retain their existing behavior.
+
 ## 0.8.0 — 2026-09-16
 
 - Add chat discovery, unread chat/history views, date ranges and per-chat sender/media/topic search.

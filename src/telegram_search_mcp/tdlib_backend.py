@@ -5,13 +5,12 @@ from __future__ import annotations
 import asyncio
 import base64
 import binascii
-import fcntl
 import hashlib
 import json
 import mimetypes
 import os
+import platform
 import queue
-import stat
 import threading
 import time
 from dataclasses import dataclass
@@ -32,6 +31,7 @@ from .backend import (
 from .keychain import get_secret
 from .paths import database_dir, ensure_runtime_layout, files_dir, lock_path
 from .policy import Policy, PolicyError
+from .platform_support import open_private_file, open_owned_readonly, acquire_file_lock, release_file_lock
 from .tdjson import (
     AuthorizationController,
     AuthorizationMachine,
@@ -137,6 +137,7 @@ class TdlibSession:
                     use_secret_chats=False,
                     device_model="Shared local read-only Telegram search",
                     application_version=__version__,
+                    system_version=platform.system(),
                 )
                 self.transport = CtypesTdJsonTransport(log_verbosity=0)
                 from .native_runtime import verify
@@ -262,23 +263,18 @@ class TdlibSession:
 
     def _acquire_profile_lock(self) -> None:
         path = lock_path(self.profile)
-        flags = os.O_RDWR | os.O_CREAT
-        if hasattr(os, "O_NOFOLLOW"):
-            flags |= os.O_NOFOLLOW
-        descriptor = os.open(path, flags, 0o600)
-        os.fchmod(descriptor, 0o600)
-        stat = os.fstat(descriptor)
-        if stat.st_uid != os.getuid() or stat.st_mode & 0o077:
-            os.close(descriptor)
-            raise RuntimeError("TDLib profile lock has unsafe ownership or permissions")
+        descriptor = open_private_file(path)
         handle = os.fdopen(descriptor, "a+", encoding="utf-8")
         try:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            acquire_file_lock(handle.fileno())
         except BlockingIOError as exc:
             handle.close()
             raise SessionBusyError(
                 "Telegram profile is in use by another local process"
             ) from exc
+        except BaseException:
+            handle.close()
+            raise
         self._lock_handle = handle
 
     def _close_components(self) -> None:
@@ -290,7 +286,7 @@ class TdlibSession:
         self._closing = False
         if self._lock_handle is not None:
             try:
-                fcntl.flock(self._lock_handle.fileno(), fcntl.LOCK_UN)
+                release_file_lock(self._lock_handle.fileno())
             finally:
                 self._lock_handle.close()
                 self._lock_handle = None
@@ -1213,14 +1209,12 @@ def _read_private_media_file(path_value: str, *, root: Path, max_bytes: int) -> 
         resolved.relative_to(safe_root)
     except (FileNotFoundError, RuntimeError, ValueError) as exc:
         raise MediaError("TDLib returned an unsafe media path") from exc
-    flags = os.O_RDONLY
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    descriptor = os.open(resolved, flags)
+    try:
+        descriptor = open_owned_readonly(candidate)
+    except RuntimeError as exc:
+        raise MediaError("Downloaded Telegram media has unsafe ownership or type") from exc
     try:
         info = os.fstat(descriptor)
-        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid():
-            raise MediaError("Downloaded Telegram media has unsafe ownership or type")
         if info.st_size <= 0:
             raise MediaError("Downloaded Telegram media is empty")
         if info.st_size > max_bytes:

@@ -454,7 +454,7 @@ class JsonTransport(Protocol):
 
 
 def tdjson_library_candidates(explicit_path: str | os.PathLike[str] | None = None) -> tuple[Path, ...]:
-    """Return ordered macOS/Linux candidates without loading anything."""
+    """Return ordered native-library candidates without loading anything."""
 
     values: list[str] = []
     if explicit_path:
@@ -525,10 +525,11 @@ class CtypesTdJsonTransport:
     def _load_library(
         explicit_path: str | os.PathLike[str] | None,
     ) -> tuple[Path, ctypes.CDLL]:
+        from .native_runtime import load_library
         errors: list[str] = []
         for candidate in tdjson_library_candidates(explicit_path):
             try:
-                library = ctypes.CDLL(os.fspath(candidate))
+                library = load_library(candidate)
                 try:
                     resolved = candidate.resolve()
                 except OSError:

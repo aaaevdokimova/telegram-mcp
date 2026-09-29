@@ -1,5 +1,10 @@
 # Install or upgrade with Codex or Gemini CLI
 
+For native **Windows x64 / ChatGPT Work**, follow [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md)
+and use `install-windows.ps1`. The macOS procedure below does not apply to Windows.
+Do not copy Telegram sessions or secrets between computers or users.
+
+
 This guide is for an agent acting on a user's explicit installation request. It
 supports local Codex app/CLI and Gemini CLI on macOS equally. Either agent can
 perform the installation directly; Gemini CLI does not require Codex.

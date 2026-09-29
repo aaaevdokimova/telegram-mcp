@@ -1,5 +1,9 @@
 # Telegram in Codex and Gemini CLI: quick start
 
+**Windows + ChatGPT Work:** use [the Windows setup guide](INSTALL_WINDOWS.md).
+The PowerShell installer adds Telegram MCP to your personal plugin catalog.
+
+
 This archive connects **your own Telegram account** to Codex, Gemini CLI, or both
 clients on one Mac. Gemini integration requires **Gemini CLI**; the Gemini website
 and mobile app are not supported.

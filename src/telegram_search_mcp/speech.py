@@ -3,12 +3,12 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
-import os
 import re
 import time
 
 from .backend import MediaError
 from .paths import ensure_private_dir
+from .platform_support import fsync_directory
 from .policy import _assert_private_file, _atomic_private_json
 from .tdjson import TdlibError
 
@@ -73,11 +73,7 @@ def transcribe(session, directory: Path, *, chat_id: int, message_id: int,
         # Persist before dispatch. A timeout, client cancellation or restart must
         # never trigger a second quota-consuming request for the same message.
         _atomic_private_json(marker, {"user_id": session.user_id, "requested": True})
-        descriptor = os.open(directory, os.O_RDONLY)
-        try:
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
+        fsync_directory(directory)
         try:
             session.request({"@type": "recognizeSpeech", "chat_id": chat_id, "message_id": message_id}, timeout=10.0)
         except TdlibError as exc:

@@ -35,7 +35,7 @@ def current_notes(source: Path, version: str) -> str:
         if expected not in (source / name).read_text():
             raise RuntimeError(f'{name} does not describe the current version')
     changes = sections[0].split('\n', 1)[1].strip()
-    return f'''Telegram MCP for Codex and Gemini CLI on macOS: chat navigation, unread history, search, local file downloads, Telegram-native voice/video-note transcription, and optional drafts, replies and scheduled text/document sending. Thirteen tools by default, seventeen with sending enabled.
+    return f'''Telegram MCP for ChatGPT Work on Windows x64 and Codex and Gemini CLI on macOS: chat navigation, unread history, search, local file downloads, Telegram-native voice/video-note transcription, and optional drafts, replies and scheduled text/document sending. Thirteen tools by default, seventeen with sending enabled.
 
 ## Changes in {version}
 
@@ -43,7 +43,9 @@ def current_notes(source: Path, version: str) -> str:
 
 ## Install or upgrade
 
-Download **telegram-mcp-macos.zip** and its **.sha256**, verify the checksum, extract it and open **install-macos.command**. A compatible Telegram login is preserved. Restart Codex/Gemini CLI after installation. Each user keeps their own Telegram account and credentials on their Mac.
+Windows: download **telegram-mcp-windows.zip**, extract it and run **install-windows.ps1**; see [Windows setup](https://github.com/{REPOSITORY}/blob/v{version}/INSTALL_WINDOWS.md). Install the resulting local plugin from ChatGPT Work Plugins. Windows updates are manual.
+
+macOS: download **telegram-mcp-macos.zip** and its **.sha256**, verify the checksum, extract it and open **install-macos.command**. A compatible Telegram login is preserved. Restart Codex/Gemini CLI after installation. Each user keeps their own Telegram account and credentials on their Mac.
 
 [Installation guide](https://github.com/{REPOSITORY}/blob/v{version}/INSTALL.md) · [Verification and limits](https://github.com/{REPOSITORY}/blob/v{version}/VERIFICATION.md)
 
@@ -75,9 +77,13 @@ def prepare(source: Path, directory: Path) -> tuple[str, list[Path], Path]:
     shutil.copyfile(archive, stable)
     stable_sum = stable.with_suffix('.zip.sha256')
     stable_sum.write_text(f'{hashlib.sha256(stable.read_bytes()).hexdigest()}  {stable.name}\n')
+    windows = directory / 'telegram-mcp-windows.zip'
+    shutil.copyfile(archive, windows)
+    windows_sum = windows.with_suffix('.zip.sha256')
+    windows_sum.write_text(f'{hashlib.sha256(windows.read_bytes()).hexdigest()}  {windows.name}\n')
     body = directory / 'release-notes.md'
     body.write_text(notes)
-    return version, [archive, checksum, inventory, wheel, stable, stable_sum], body
+    return version, [archive, checksum, inventory, wheel, stable, stable_sum, windows, windows_sum], body
 
 
 def api(path: str) -> dict | None:
