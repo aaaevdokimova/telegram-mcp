@@ -5,11 +5,19 @@ All installation, plugin and marketplace files live in a disposable directory.
 Only MCP initialization/discovery and the local sending preference are exercised;
 no tool is called and no Telegram profile or Credential Manager secret is opened.
 Requires native Windows x64, Python 3.13, PowerShell and uv.
+
+Use --expected-windows 10 or 11 inside an actual desktop Windows VM to reject
+Windows Server and the other desktop version. --report-path writes JSON evidence
+including the observed OS, archive hash, completed checks, and final outcome.
+Keep reports outside the release source tree, for example in dist/acceptance/.
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
+from datetime import datetime, timezone
+import hashlib
 import importlib.util
 import json
 import os
@@ -17,8 +25,98 @@ from pathlib import Path
 import platform
 import shutil
 import subprocess
+import sys
 import tempfile
 import zipfile
+
+
+WINDOWS_IDENTITY_CHECK = r"""
+$ErrorActionPreference = 'Stop'
+$env:PSModulePath = [IO.Path]::Combine($PSHOME, 'Modules')
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+$version = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+$system = Get-CimInstance -ClassName Win32_OperatingSystem
+[ordered]@{
+    ProductName = $version.ProductName
+    DisplayVersion = $version.DisplayVersion
+    ReleaseId = $version.ReleaseId
+    CurrentBuild = $version.CurrentBuild
+    UBR = $version.UBR
+    Caption = $system.Caption
+    Version = $system.Version
+    OSArchitecture = $system.OSArchitecture
+    ProductType = $system.ProductType
+    PowerShellVersion = $PSVersionTable.PSVersion.ToString()
+} | ConvertTo-Json -Compress
+"""
+
+
+def system_powershell() -> Path:
+    # powershell_path() imports pywin32. Keep that DLL out of this long-lived
+    # verifier: uv hardlinks its cached wheels into disposable environments, and
+    # Windows cannot delete their pywintypes DLL while another link is mapped.
+    completed = subprocess.run(
+        [sys.executable, "-I", "-X", "utf8", "-c",
+         "from telegram_search_mcp.windows_install import powershell_path; print(powershell_path())"],
+        check=True, capture_output=True, encoding="utf-8", timeout=30,
+    )
+    return Path(completed.stdout.strip())
+
+
+def read_windows_identity(powershell: Path) -> dict:
+    """Read host facts independently of marketing names or runner labels."""
+    encoded = base64.b64encode(WINDOWS_IDENTITY_CHECK.encode("utf-16-le")).decode("ascii")
+    completed = subprocess.run(
+        [str(powershell), "-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+        check=True, capture_output=True, timeout=30,
+    )
+    identity = json.loads(completed.stdout.decode("utf-8-sig"))
+    if not isinstance(identity, dict):
+        raise RuntimeError("Windows identity must be a JSON object")
+    return identity
+
+
+def classify_windows(identity: dict) -> tuple[str, str | None]:
+    """Windows 11 can report ProductName='Windows 10'; use kernel build/type."""
+    product_type = identity.get("ProductType")
+    if type(product_type) is not int or product_type not in {1, 2, 3}:
+        raise RuntimeError("Windows ProductType is missing or invalid")
+    try:
+        version = tuple(int(part) for part in identity["Version"].split("."))
+        build = int(identity["CurrentBuild"])
+    except (KeyError, TypeError, ValueError, AttributeError) as error:
+        raise RuntimeError("Windows version/build evidence is missing or invalid") from error
+    if len(version) != 3 or build != version[2]:
+        raise RuntimeError("Registry and Win32_OperatingSystem build evidence disagree")
+    if product_type in {2, 3}:
+        return "server", None
+    if version[:2] == (10, 0) and build >= 10240:
+        return "desktop", "11" if build >= 22000 else "10"
+    return "desktop", None
+
+
+def require_windows_version(identity: dict, expected: str | None) -> tuple[str, str | None]:
+    family, desktop_version = classify_windows(identity)
+    if expected is not None and (family != "desktop" or desktop_version != expected):
+        observed = "Windows Server" if family == "server" else f"desktop Windows {desktop_version or 'unknown'}"
+        raise RuntimeError(f"Expected desktop Windows {expected}; actual OS is {observed}")
+    return family, desktop_version
+
+
+def write_report(path: Path | None, report: dict) -> None:
+    serialized = json.dumps(report, indent=2, ensure_ascii=True) + "\n"
+    if path is not None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # A failed run must replace prior success evidence as well.
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                         prefix=path.name + ".", suffix=".tmp", delete=False) as temporary:
+            temporary.write(serialized)
+            pending = Path(temporary.name)
+        try:
+            os.replace(pending, path)
+        finally:
+            pending.unlink(missing_ok=True)
+    print("ACCEPTANCE_REPORT_JSON: " + json.dumps(report, sort_keys=True, ensure_ascii=True))
 
 
 MCP_DISCOVERY_CHECK = """
@@ -134,26 +232,14 @@ def plugin_configuration(marketplace: Path, install: Path, original: dict) -> Pa
     return configuration
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("archive", type=Path)
-    args = parser.parse_args()
-    if platform.system() != "Windows" or platform.machine().lower() not in {"amd64", "x86_64"}:
-        parser.error("The actual installer smoke test requires native Windows x64")
-    from telegram_search_mcp.windows_install import powershell_path
-    powershell = powershell_path()
-    if not powershell.is_file() or shutil.which("uv") is None:
-        parser.error("System Windows PowerShell 5.1 and uv must already be installed")
-    spec = importlib.util.spec_from_file_location("release", Path(__file__).with_name("release.py"))
-    assert spec is not None and spec.loader is not None
-    release = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(release)
-    manifest = release.verify_archive(args.archive)
+def exercise_archive(archive_path: Path, manifest: dict, powershell: Path, checks: list[dict]) -> None:
+    def passed(name: str) -> None:
+        checks.append({"name": name, "status": "passed"})
 
     # Exercise native PowerShell argument/JSON encoding for ordinary user paths.
     with tempfile.TemporaryDirectory(prefix="telegram windows install check ") as temporary:
         root = Path(temporary).resolve()
-        with zipfile.ZipFile(args.archive) as archive:
+        with zipfile.ZipFile(archive_path) as archive:
             archive.extractall(root / "исходники source")
         source = root / "исходники source" / manifest["archive_root"]
         install = root / "приложение with spaces"
@@ -181,15 +267,21 @@ def main() -> None:
         ]
         # Explicit disposable destinations; never override the user's home or credentials.
         subprocess.run(command, check=True, timeout=600)
+        passed("initial_archive_install_in_unicode_path")
         first = active_version(install)
         first_python = first / ".venv" / "Scripts" / "python.exe"
         subprocess.run([str(first_python), "-I", "-m", "telegram_search_mcp.cli", "--help"], check=True, timeout=30)
+        passed("installed_cli")
         subprocess.run([str(first_python), "-I", "-c", NATIVE_RUNTIME_CHECK, manifest["version"]], check=True, timeout=30)
+        passed("initial_pinned_python_package_and_tdlib")
         configuration = plugin_configuration(marketplace, install, original)
+        passed("initial_marketplace_preserves_existing_plugin")
         subprocess.run([str(first_python), "-I", "-c", MCP_DISCOVERY_CHECK, str(configuration), "default"], check=True, timeout=60)
+        passed("initial_mcp_discovery_15_tools")
         subprocess.run([str(first_python), "-I", "-m", "telegram_search_mcp.cli", "sending", "on"], check=True, timeout=30)
         configuration = plugin_configuration(marketplace, install, original)
         subprocess.run([str(first_python), "-I", "-c", MCP_DISCOVERY_CHECK, str(configuration), "sending"], check=True, timeout=60)
+        passed("sending_mcp_discovery_19_tools")
         configuration_before = configuration.read_bytes()
         # First install inherits the runner's PowerShell 7 -> Python environment.
         # Reinstall also works with an unrelated inherited module search path.
@@ -201,15 +293,80 @@ def main() -> None:
         second = active_version(install)
         assert second != first, "Reinstallation must activate a new immutable version"
         assert first_python.is_file(), "Reinstallation must preserve the former interpreter"
+        passed("immutable_reinstall_with_unrelated_powershell_module_path")
         second_python = second / ".venv" / "Scripts" / "python.exe"
         configuration = plugin_configuration(marketplace, install, original)
         assert configuration.read_bytes() == configuration_before, "Reinstallation changed the stable plugin launcher"
+        passed("reinstall_preserves_marketplace_and_stable_launcher")
         subprocess.run([str(second_python), "-I", "-c", NATIVE_RUNTIME_CHECK, manifest["version"]], check=True, timeout=30)
+        passed("reinstalled_pinned_python_package_and_tdlib")
         subprocess.run([str(second_python), "-I", "-c", MCP_DISCOVERY_CHECK, str(configuration), "sending"], check=True, timeout=60)
+        passed("reinstall_preserves_sending_19_tools")
         subprocess.run([str(second_python), "-I", "-m", "telegram_search_mcp.cli", "sending", "off"], check=True, timeout=30)
         configuration = plugin_configuration(marketplace, install, original)
         subprocess.run([str(second_python), "-I", "-c", MCP_DISCOVERY_CHECK, str(configuration), "default"], check=True, timeout=60)
+        passed("sending_disabled_mcp_discovery_15_tools")
         print("PASS: verified archive, isolated native Windows installation and immutable update, marketplace and sending preference preservation, pinned TDLib, CLI and installed plugin discovery. No Telegram authorization or tool invocation performed.")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("archive", type=Path)
+    parser.add_argument("--expected-windows", choices=("10", "11"),
+                        help="Require this desktop Windows version; reject Windows Server")
+    parser.add_argument("--report-path", type=Path,
+                        help="Write OS, archive hash and acceptance outcome as JSON outside the source tree")
+    args = parser.parse_args()
+    archive_path = args.archive.resolve()
+    report_path = args.report_path.resolve() if args.report_path is not None else None
+    if report_path == archive_path:
+        parser.error("The report must not overwrite the release archive")
+    report = {
+        "schema_version": 1,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "status": "failed",
+        "expected_windows_version": args.expected_windows,
+        "archive": {"filename": archive_path.name},
+        "host": {"hostname": platform.node(), "system": platform.system(),
+                 "machine": platform.machine(), "python_version": platform.python_version()},
+        "checks": [],
+        "telegram_authorization_performed": False,
+        "telegram_tools_invoked": False,
+        "client_ui_tested": False,
+    }
+    try:
+        if platform.system() != "Windows" or platform.machine().lower() not in {"amd64", "x86_64"}:
+            raise RuntimeError("The actual installer smoke test requires native Windows x64")
+        powershell = system_powershell()
+        if not powershell.is_file():
+            raise RuntimeError("System Windows PowerShell 5.1 must already be installed")
+        identity = read_windows_identity(powershell)
+        report["windows"] = identity
+        family, desktop_version = classify_windows(identity)
+        report["windows_family"] = family
+        report["detected_desktop_windows_version"] = desktop_version
+        require_windows_version(identity, args.expected_windows)
+        report["checks"].append({"name": "actual_os_identity", "status": "passed"})
+        observed = "Windows Server" if family == "server" else f"desktop Windows {desktop_version or 'unknown'}"
+        print(f"Actual OS: {observed}; {identity['Caption']}; build {identity['CurrentBuild']}.{identity['UBR']}", flush=True)
+        if shutil.which("uv") is None:
+            raise RuntimeError("uv must already be installed and available on PATH")
+        spec = importlib.util.spec_from_file_location("release", Path(__file__).with_name("release.py"))
+        assert spec is not None and spec.loader is not None
+        release = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(release)
+        manifest = release.verify_archive(archive_path)
+        report["archive"].update({"sha256": hashlib.sha256(archive_path.read_bytes()).hexdigest(),
+                                 "version": manifest["version"]})
+        report["checks"].append({"name": "verified_release_archive", "status": "passed"})
+        exercise_archive(archive_path, manifest, powershell, report["checks"])
+        report["status"] = "passed"
+    except BaseException as error:
+        report["error"] = {"type": type(error).__name__, "message": str(error)}
+        raise
+    finally:
+        report["finished_at"] = datetime.now(timezone.utc).isoformat()
+        write_report(report_path, report)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,36 @@
+name: Windows 10 and 11 desktop installation
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-desktop-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  desktop-install:
+    name: Windows ${{ matrix.windows }} x64 installation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        windows: ['10', '11']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install and test in an isolated desktop Windows VM
+        run: python3 -I scripts/smoke-windows-desktop.py --windows '${{ matrix.windows }}' --output dist/desktop-${{ matrix.windows }}
+      - name: Preserve actual OS, installer, and VM evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: windows-${{ matrix.windows }}-desktop-evidence
+          path: dist/desktop-${{ matrix.windows }}
+          if-no-files-found: error
+          retention-days: 30

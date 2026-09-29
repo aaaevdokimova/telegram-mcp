@@ -1,5 +1,56 @@
 # Verification
 
+## Version 0.9.2 — English documentation and Windows desktop verification
+
+All installation guides and user-facing examples are in English. Unicode fixture
+content and paths remain in tests to verify non-ASCII messages and user folders.
+
+Windows installer verification records the real operating-system edition, display
+version, build and architecture. A desktop acceptance run must identify Windows 10
+or Windows 11 explicitly and reject Windows Server. The earlier `windows-latest`
+checks ran on **Windows Server 2025**, not either desktop edition.
+
+Both desktop VM jobs passed in [run 36602348419](https://github.com/prabchevski/telegram-mcp/actions/runs/36602348419)
+at commit `239fa8682df0d01f57bca3006a7118310d9ec92d` on September 29, 2026:
+
+| Actual desktop OS | Build | Architecture | Windows PowerShell | Result |
+| --- | --- | --- | --- | --- |
+| Windows 10 Enterprise Evaluation 22H2 | 19045.2006 | x64 | 5.1.19041.1682 | 13/13 checks passed |
+| Windows 11 Enterprise Evaluation 25H2 | 26200.6584 | x64 | 5.1.26100.6584 | 13/13 checks passed |
+
+Both used Python 3.13.13 and the same verified source archive, SHA-256
+`32160c5d067170f04834428c13774b1ad2e6c404fd823e585df2ed1f8857316e`.
+Evidence artifacts include `acceptance.json`, `test-user.json` and `provenance.json`.
+The OS check uses CIM ProductType and coherent kernel/registry builds; Windows 11
+can retain a misleading Windows 10 registry product name.
+
+The checks cover the actual archive installer in Unicode paths, CLI startup,
+pinned Python package and native TDLib, preservation of an existing marketplace
+plugin, MCP initialization and discovery of 15 tools, sending enabled with 19
+tools, a second immutable installation with an unrelated inherited PowerShell
+module path, preservation of the previous interpreter and stable launcher,
+preservation of sending preferences, and a return to 15 tools with sending off.
+Strict cleanup passed as well. A native regression prevents the verifier itself
+from holding a pywin32 DLL open while deleting uv-linked temporary environments.
+
+The VMs use official Microsoft evaluation ISOs with pinned SHA-256 values and a
+pinned QEMU container. Installation runs under a disposable standard user. The
+unattended VM image disables UAC (`EnableLUA=0`); it is not evidence for every OEM
+image, enterprise policy, Windows edition, patch level, or interactive UAC flow.
+Python/uv bootstrap for the test driver precedes the installer check.
+
+The same source passed [Test and package run 36602356173](https://github.com/prabchevski/telegram-mcp/actions/runs/36602356173),
+including Windows Server, Linux/macOS, archive/wheel verification, the actual macOS
+installer and the unmodified 0.6.1 updater. Local tests passed 516 checks with 10
+native Windows skips; the source inventory contains 95 allowlisted text files.
+Publication now requires both desktop VMs to pass again for the exact `main`
+revision, alongside the existing tests and package checks.
+
+These checks use disposable programs and client configuration, with no real
+Telegram authorization, Telegram tool invocation or search-quota consumption.
+Real Codex/ChatGPT graphical plugin activation, the owner's Telegram login, and
+authenticated multi-chat use still require acceptance on the target computer.
+
 ## Version 0.9.1 — Windows release, public-search quota and explicit consent
 
 This change adds a read-only quota operation and requires a fresh account/query/

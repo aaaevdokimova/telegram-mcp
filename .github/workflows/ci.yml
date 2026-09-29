@@ -78,6 +78,7 @@ jobs:
           retention-days: 30
 
   windows-install:
+    name: Windows Server 2025 installation
     runs-on: windows-latest
     timeout-minutes: 25
     steps:
@@ -121,10 +122,22 @@ jobs:
           $archives = @(Get-ChildItem -LiteralPath dist -Filter '*.zip')
           if ($archives.Count -ne 1) { throw 'Expected exactly one source release archive' }
           $archive = $archives[0].FullName
-          uv run --frozen python -I scripts/smoke-install-windows.py $archive
+          uv run --frozen python -I scripts/smoke-install-windows.py $archive --report-path dist/windows-server-acceptance.json
+      - name: Save Windows Server acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: windows-server-acceptance
+          path: dist/windows-server-acceptance.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  windows-desktop:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/windows-desktop.yml
 
   publish-release:
-    needs: [release-artifacts, windows-install]
+    needs: [release-artifacts, windows-install, windows-desktop]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'prabchevski/telegram-mcp'
     runs-on: ubuntu-latest
     timeout-minutes: 5

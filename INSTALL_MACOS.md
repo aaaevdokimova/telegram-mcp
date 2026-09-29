@@ -1,12 +1,12 @@
-# macOS: установка, обновления и устранение неполадок
+# macOS installation, upgrades, and troubleshooting
 
-Этот установщик подключает локальный MCP к **Codex app/CLI, Gemini CLI или обоим**.
-Для установки нейронкой дайте ей ссылку на репозиторий и попросите следовать
-[INSTALL.md](INSTALL.md). Для кратких ручных шагов — [START_HERE.md](START_HERE.md).
-Windows использует отдельный [пакет и инструкцию](INSTALL_WINDOWS.md).
+This installer connects a local MCP server to **Codex app/CLI, Gemini CLI, or both**.
+To have an AI agent install it, give the agent the repository link and ask it to
+follow [INSTALL.md](INSTALL.md). For a short manual guide, see [START_HERE.md](START_HERE.md).
+Windows uses a separate [package and guide](INSTALL_WINDOWS.md).
 
-Ниже приведены точные команды и подробности обновления. Первый вход выполняется
-в вашем локальном Terminal; секреты и QR-код не нужно передавать в чат.
+The commands and upgrade details are below. Complete your first login in your
+local Terminal; never share secrets or the QR code in chat.
 
 ## Requirements
 

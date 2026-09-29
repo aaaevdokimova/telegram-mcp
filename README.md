@@ -1,41 +1,41 @@
-# Telegram MCP · 0.9.1
+# Telegram MCP · 0.9.2
 
-Подключите **свой Telegram** к **Codex или Gemini CLI на macOS**, **Codex на Windows x64** либо **ChatGPT Work с локальными плагинами на Windows x64**. Можно искать и читать сообщения, скачивать вложения, расшифровывать голосовые, а при отдельном включении — готовить и отправлять сообщения. Один локальный сервис обслуживает несколько чатов и клиентов с одним входом в Telegram.
+Connect **your own Telegram account** to **Codex or Gemini CLI on macOS**, **Codex on Windows x64**, or **ChatGPT Work with local plugins on Windows x64**. Search and read messages, download attachments, transcribe voice notes, and optionally prepare and send messages. One local service supports multiple chats and clients with a single Telegram login.
 
-## Дайте эту ссылку своему AI-агенту
+## Give this link to your AI agent
 
-Скопируйте в Codex или Gemini CLI на нужном компьютере:
+Paste this into your local AI client on the computer where you want to install it:
 
-> Установи https://github.com/prabchevski/telegram-mcp для того клиента, которым я сейчас пользуюсь. Прочитай AGENTS.md и INSTALL.md, определи мою ОС, скачай подходящий архив последнего релиза и проверь SHA-256. Если установка уже есть — обнови её, сохрани вход в Telegram и остальные настройки. Выполни доступные проверки; первый вход я пройду в локальном окне, без передачи секретов в чат.
+> Install https://github.com/prabchevski/telegram-mcp for the client I am using now. Read AGENTS.md and INSTALL.md, detect my operating system, download the matching archive from the latest release, and verify its SHA-256. If it is already installed, upgrade it while preserving my Telegram login and other settings. Complete the available checks; I will handle the first login in a local window without sharing secrets in chat.
 
-Агент выберет инструкции для вашей ОС и клиента. Запрос «установи» уже разрешает обычную установку, зависимости и настройку выбранного клиента. Для первого подключения нужны ваши `api_id` и `api_hash` с [my.telegram.org](https://my.telegram.org): вводите их, код входа и пароль 2FA **только в локальном окне авторизации**. Существующий совместимый вход сохраняется. Перезапуск клиента или включение плагина может потребовать вашего действия.
+The agent selects the instructions for your operating system and client. Your installation request authorizes normal setup, dependencies, and configuration of the selected client. The first connection requires your `api_id` and `api_hash` from [my.telegram.org](https://my.telegram.org): enter them, your login code, and any 2FA password **only in the local authorization window**. A compatible existing login is preserved. You may need to restart the client or enable the plugin yourself.
 
-**Для устанавливающего агента: начните с [AGENTS.md](AGENTS.md) → [INSTALL.md](INSTALL.md).** Не устанавливайте рабочую копию при простом просмотре или разработке проекта.
+**Installing agents: start with [AGENTS.md](AGENTS.md) → [INSTALL.md](INSTALL.md).** Do not set up a personal installation merely to review or develop this project.
 
-## Выберите свою систему
+## Choose your platform
 
-| Система и клиент | Способ подключения | Инструкция |
+| Operating system and client | Connection | Instructions |
 | --- | --- | --- |
-| macOS Apple Silicon / Intel · Codex app или CLI | Локальный MCP, настройка Codex | [Установка на macOS](INSTALL_MACOS.md) |
-| macOS Apple Silicon / Intel · Gemini CLI | Локальный MCP, настройка Gemini CLI; Codex не требуется | [Установка на macOS](INSTALL_MACOS.md) |
-| Windows x64 · Codex desktop / CLI с поддержкой плагинов | Личный каталог плагинов → Telegram MCP | [Установка на Windows](INSTALL_WINDOWS.md) |
-| Windows x64 · ChatGPT Work с локальными плагинами | Личный каталог плагинов → Telegram MCP | [Установка на Windows](INSTALL_WINDOWS.md) |
+| macOS Apple Silicon / Intel · Codex app or CLI | Local MCP through Codex configuration | [Install on macOS](INSTALL_MACOS.md) |
+| macOS Apple Silicon / Intel · Gemini CLI | Local MCP through Gemini CLI configuration; Codex is not required | [Install on macOS](INSTALL_MACOS.md) |
+| Windows x64 · Codex desktop / CLI with plugin support | Personal plugin marketplace → Telegram MCP | [Install on Windows](INSTALL_WINDOWS.md) |
+| Windows x64 · ChatGPT Work with local plugins | Personal plugin marketplace → Telegram MCP | [Install on Windows](INSTALL_WINDOWS.md) |
 
-Gemini в браузере/на телефоне и обычный веб-чат ChatGPT не запускают этот локальный MCP. Пакета для нативного Windows ARM64 нет. На Windows не требуются WSL, публичный сервер или туннель. Нужен установленный клиент с поддержкой указанного способа подключения.
+Gemini in a browser or on a phone and ordinary ChatGPT web chats cannot run this local MCP. There is no native Windows ARM64 package. Windows requires no WSL, public server, or tunnel. You need an installed client that supports the listed connection method.
 
-Для ручной установки: **[macOS ZIP](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-macos.zip)** ([SHA-256](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-macos.zip.sha256)) · **[Windows ZIP](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-windows.zip)** ([SHA-256](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-windows.zip.sha256)). [Краткие шаги установки](START_HERE.md). Эти ссылки ведут на последний опубликованный релиз; архивы в разделе **Assets** содержат готовые установщики. Стандартные ссылки GitHub **Source code** не заменяют Windows-пакет.
+Manual installation: **[macOS ZIP](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-macos.zip)** ([SHA-256](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-macos.zip.sha256)) · **[Windows ZIP](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-windows.zip)** ([SHA-256](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-windows.zip.sha256)). See the [quick start](START_HERE.md). These links point to the latest published release; its **Assets** include ready-to-use installers. GitHub's standard **Source code** downloads do not replace the Windows package.
 
-На macOS установка по умолчанию включает ежедневные обновления из `main` после успешных проверок. На Windows обновление выполняется повторным запуском нового установщика. Каждый пользователь входит в собственный аккаунт; репозиторий и релизы не содержат чужих сессий или ключей. Найденные сообщения передаются выбранному AI-клиенту. Это неофициальный проект.
+On macOS, installation enables daily updates from `main` after successful checks by default. On Windows, update by running the new release's installer. Each user signs into their own account; the repository and releases contain no personal sessions or keys. Retrieved messages are shared with the selected AI client. This is an unofficial project.
 
-## Как пользоваться
+## Usage examples
 
-- «Найди в моём Telegram сообщения про встречу в пятницу».
-- «Покажи непрочитанные чаты» или «Что обсуждали вчера в этой группе?».
-- «Сохрани присланную таблицу» или «Расшифруй это голосовое».
+- “Find messages in my Telegram about Friday's meeting.”
+- “Show my unread chats” or “What did we discuss yesterday in this group?”
+- “Save the spreadsheet I received” or “Transcribe this voice message.”
 
-Сначала агент ищет по доступной истории аккаунта и подпискам. Для отдельного поиска публичных публикаций он проверяет реальный остаток бесплатных попыток, объясняет расход и **ждёт вашего согласия**. Оплата Stars отключена. По умолчанию доступны 15 инструментов; отправка выключена и добавляет ещё 4 только после включения. Подробнее — [публичный поиск](#free-public-channel-post-search) и [отправка](#optional-text-and-file-sending).
+The agent searches your accessible account history and subscriptions first. Before a separate public-post search, it checks the actual remaining free quota, explains any attempt it would consume, and **waits for your permission**. Stars payments are disabled. The default installation exposes 15 tools; sending is off and adds four tools only when enabled. See [public search](#free-public-channel-post-search) and [sending](#optional-text-and-file-sending).
 
-Автопроверки покрывают ядро на macOS, Windows и Linux, установщики и MCP-соединение. Реальный вход в Telegram и работу интерфейса выбранного клиента проверяют на компьютере пользователя. Intel macOS использует сборку закреплённой версии TDLib; автоматическая проверка установки на Mac выполняется на Apple Silicon. Точные границы проверки описаны в [VERIFICATION.md](VERIFICATION.md).
+Automated checks cover the core on macOS, Linux, and Windows Server 2025, as well as installers and MCP connections. Separate installation checks passed on x64 Windows 10 Enterprise Evaluation 22H2 (build 19045.2006) and Windows 11 Enterprise Evaluation 25H2 (build 26200.6584) virtual machines, using a standard user account. These checks verified installation, reinstallation, and MCP discovery; real Telegram login and the selected client's interface remain unverified. Intel macOS builds the pinned TDLib version; automated Mac installation checks run on Apple Silicon. See [VERIFICATION.md](VERIFICATION.md) for the exact coverage and limitations.
 
 ## Features
 
@@ -113,12 +113,12 @@ Before each new public query, the agent must:
    `user_confirmed=true` to `telegram_search_public_posts(query, limit=20, ...)`.
    If the token expires or the quota snapshot changes, check and ask again.
 
-For example, after searching subscriptions: «В ваших чатах я нашёл эти результаты.
-Могу также поискать публичные публикации по запросу “искусственный интеллект”,
-включая каналы, на которые вы не подписаны. По данным Telegram осталось N
-бесплатных попыток; этот запрос использует одну. Выполнить?» Replace the quota
-statement with the actual result, including when the query is already free or a
-wait is required. Do not offer a paid alternative.
+For example, after searching subscriptions: “I found these results in your chats.
+I can also search public posts for ‘artificial intelligence’, including channels
+you do not follow. Telegram reports N free attempts remaining; this query would
+use one. Shall I search?” Replace the quota statement with the actual result,
+including when the query is already free or a wait is required. Do not offer a
+paid alternative.
 
 The confirmation token is single-use, expires after five minutes and is bound to
 the account, query and quota snapshot. Missing confirmation never starts a public
@@ -152,8 +152,8 @@ after ten minutes or a service restart, and can be successfully consumed once.
 Do not interpret a limit, partial result or failed request as proof that a post
 does not exist.
 
-The implementation is shared across platforms; CI covers macOS, Windows and Linux
-core behavior. Packaged desktop installation is provided for macOS and Windows.
+The implementation is shared across platforms; CI covers macOS, Windows Server
+2025 and Linux core behavior. Packaged desktop installation is provided for macOS and Windows.
 
 Official contracts: [searchPublicPosts](https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1search_public_posts.html),
 [publicPostSearchLimits](https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1public_post_search_limits.html).
@@ -366,8 +366,8 @@ uv run --frozen python -I scripts/release.py build --output dist
 ```
 
 Tests use isolated profiles and settings and do not require a Telegram account.
-CI tests Linux/macOS and native Windows x64, and builds and installs an allowlisted source archive on a
-GitHub-hosted Mac. This is a test environment, not the maintainer's or users' Macs.
+CI tests Linux/macOS and native Windows x64 on Windows Server 2025, and builds and
+installs an allowlisted source archive on a GitHub-hosted Mac. This is a test environment, not the maintainer's or users' Macs.
 After these checks pass on main, CI publishes each new package version to
 [GitHub Releases](https://github.com/prabchevski/telegram-mcp/releases/latest), with
 the verified archive, checksum, file inventory and wheel. Existing published tags

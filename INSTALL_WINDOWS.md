@@ -1,64 +1,66 @@
-# Telegram MCP в Codex и ChatGPT Work на Windows
+# Telegram MCP for Codex and ChatGPT Work on Windows
 
-Нужны Windows x64, 64-битный PowerShell, интернет и Codex либо ChatGPT в режиме Work с доступом к локальным плагинам. Для Codex desktop и Work используется один и тот же плагин из персонального каталога; выбирать другой установщик не нужно. Права администратора и WSL не нужны. В этой версии нет поддержки нативного ARM64 и автоматических обновлений Windows.
+You need Windows x64, 64-bit PowerShell, internet access, and Codex or ChatGPT Work with local plugin support. Codex desktop and Work use the same personal-marketplace plugin and installer. Administrator rights and WSL are not required. This version does not support native ARM64 or automatic Windows updates.
 
-Можно дать локальному агенту ссылку на этот репозиторий и написать: «Установи Telegram MCP для Codex на этом компьютере». Агент выполняет загрузку, проверку и настройку ниже. Войти в Telegram нужно самому в локальном окне; секреты не передаются нейронке. Обычный облачный чат без доступа к компьютеру не может выполнить локальную установку.
+Check the client's own operating-system requirements as well. OpenAI [recommends Windows 11 for its Windows sandbox](https://learn.chatgpt.com/docs/windows/windows-sandbox#windows-version-matrix); recent, fully updated Windows 10 is supported on a best-effort basis. An installer check does not verify every Windows build or the client's interface.
 
-## Установка
+Give your local agent the repository link and say: “Install Telegram MCP for Codex on this computer.” The agent performs the download, verification, and setup below. Complete Telegram login yourself in a local window; never share secrets with the AI. An ordinary cloud chat without access to your computer cannot perform a local installation.
 
-1. Откройте [последний выпуск](https://github.com/prabchevski/telegram-mcp/releases/latest), скачайте `telegram-mcp-windows.zip` и `telegram-mcp-windows.zip.sha256` из одного выпуска. Сравните `Get-FileHash .\telegram-mcp-windows.zip -Algorithm SHA256` с контрольной суммой, затем распакуйте архив. Встроенный `install-windows.ps1` находится в папке `telegram-mcp-macos` внутри архива: имя папки сохранено для совместимости обновлений, пакет содержит оба установщика. В стандартном GitHub **Source code (zip)** этого PowerShell-файла нет.
-2. Откройте PowerShell в распакованной папке с `install-windows.ps1` и выполните:
+## Installation
+
+1. Open the [latest release](https://github.com/prabchevski/telegram-mcp/releases/latest) and download `telegram-mcp-windows.zip` and `telegram-mcp-windows.zip.sha256` from the same release. Compare `Get-FileHash .\telegram-mcp-windows.zip -Algorithm SHA256` with the checksum, then extract the archive. The included `install-windows.ps1` is in the archive's `telegram-mcp-macos` directory: this name is retained for upgrade compatibility, and the package contains both installers. GitHub's standard **Source code (zip)** does not include this PowerShell file.
+2. Open PowerShell in the extracted directory containing `install-windows.ps1` and run:
 
    ```powershell
    powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\install-windows.ps1
    ```
 
-   `Bypass` действует только на этот процесс. Установщик проверяет SHA-256 закреплённого uv, устанавливает Python 3.13 и зависимости из `uv.lock`, затем проверяет версию и commit TDLib.
-3. В этом же локальном окне введите свой `api_id` и `api_hash` с https://my.telegram.org. Подтвердите QR-вход в Telegram → Настройки → Устройства. Код входа и пароль 2FA вводятся скрыто. Не отправляйте их в чат ChatGPT.
-4. Перезапустите приложение Codex или ChatGPT. В **Codex** либо **Work** откройте **Plugins**, выберите источник **Personal** (или название вашего существующего персонального каталога) и установите **Telegram MCP**. Начните новый чат с включённым плагином. В актуальном Codex CLI тот же каталог доступен через `/plugins`.
-5. Например: «Найди в моём Telegram сообщения про встречу в пятницу».
+   `Bypass` applies only to this process. The installer verifies the pinned uv download's SHA-256, installs Python 3.13 and dependencies from `uv.lock`, and checks TDLib's version and commit.
+3. In the same local window, enter your `api_id` and `api_hash` from [my.telegram.org](https://my.telegram.org). Confirm the QR login in Telegram → Settings → Devices. Login codes and 2FA passwords are entered without echoing. Never send them to a ChatGPT chat.
+4. Restart Codex or ChatGPT. In **Codex** or **Work**, open **Plugins**, choose **Personal** (or your existing personal marketplace's name), and install **Telegram MCP**. Start a new chat with the plugin enabled. Current Codex CLI versions expose the same marketplace through `/plugins`.
+5. Try: “Find messages in my Telegram about Friday's meeting.”
 
-Первичная установка предлагает 15 инструментов. Отправка сообщений и изменение черновиков выключены. Найденные сообщения и медиа передаются выбранному AI-клиенту при использовании инструментов. Секретные чаты не поддерживаются.
+A new installation exposes 15 tools. Sending messages and changing drafts are disabled. Retrieved messages and media are shared with the selected AI client when tools are used. Secret Chats are not supported.
 
-Этот пакет регистрирует локальный плагин. Он не опубликован в общем каталоге OpenAI. Доступ к плагинам также может ограничиваться политикой вашего рабочего пространства. Автотесты проверяют Windows-установку, созданную конфигурацию и MCP; работу интерфейса Codex/ChatGPT и вход реального аккаунта нужно проверить на целевом компьютере. Не добавляйте второй сервер вручную в `config.toml` поверх этого плагина.
+This package registers a local plugin; it is not published in OpenAI's public marketplace. Workspace policies may also restrict plugin access. Automated checks cover Windows Server 2025. Separate installation, reinstallation, generated-configuration, and MCP discovery checks passed on x64 Windows 10 Enterprise Evaluation 22H2 (build 19045.2006) and Windows 11 Enterprise Evaluation 25H2 (build 26200.6584) virtual machines. Both desktop runs used a standard user account, PowerShell 5.1, and Python 3.13.13. The Codex/ChatGPT interface and real Telegram login remain unverified and must be checked on the target computer; see [VERIFICATION.md](VERIFICATION.md). Do not add a duplicate server manually in `config.toml` alongside the plugin.
 
-Сначала агент ищет по доступной истории вашего аккаунта и подпискам. Затем
-может предложить отдельный поиск публичных публикаций, включая каналы, на которые
-вы не подписаны. Перед каждым новым запросом он обязан вызвать
-`telegram_get_public_search_quota(query)`: проверка показывает текущую квоту
-аккаунта и сама не расходует попытку поиска. Фиксированное число попыток в день
-не предполагается.
+The agent searches your accessible account history and subscriptions first. It
+may then offer a separate public-post search, including channels you do not
+follow. Before each new query, it must call
+`telegram_get_public_search_quota(query)`: this reports the account's current
+quota without consuming a search attempt. No fixed daily allowance is assumed.
 
-Агент должен объяснить, сколько бесплатных попыток осталось, нужно ли ждать,
-расходует ли предложенный запрос одну попытку или уже доступен бесплатно, и
-спросить: «Могу так поискать?» Поиск начинается только после вашего ответа.
-Например: «В ваших подписках нашёл эти публикации. Могу также поискать по запросу
-“искусственный интеллект” в публичных каналах вне подписок. Осталось N бесплатных
-попыток, этот запрос использует одну. Выполнить?» Число и условия берутся из
-текущего ответа Telegram.
+The agent must explain the remaining free attempts, any required wait, and
+whether the proposed query would use an attempt or is already free. It must ask
+“May I run this search?” and wait for your answer. For example: “I found these
+posts in your subscriptions. I can also search public channels you do not follow
+for ‘artificial intelligence’. There are N free attempts remaining, and this
+query would use one. Shall I search?” The number and conditions must come from
+Telegram's current response.
 
-Сервер требует `confirmation_token` из проверки квоты и `user_confirmed=true`.
-Токен действует пять минут, однократно, для этого аккаунта, запроса и состояния
-квоты. При изменении квоты или истечении срока агент проверяет и спрашивает
-заново. Флаг подтверждения — сообщение агента о вашем согласии: сервер сам не
-видит диалог с человеком. Инструкции передаются через MCP всем клиентам.
-Продолжение одобренного поиска через `next_cursor` бесплатно и не требует нового
-согласия; новая формулировка запроса требует новой проверки и разрешения.
+The server requires the quota check's `confirmation_token` and
+`user_confirmed=true`. The token is valid for five minutes and can be used once,
+for that account, query, and quota snapshot. If the quota changes or the token
+expires, the agent must check and ask again. The confirmation flag reports the
+agent's account of your consent: the server does not observe the human
+conversation itself. MCP sends the instructions to every client.
+Continuing an approved query through `next_cursor` is free and requires no new
+consent; rewording the query requires a fresh check and permission.
 
-Оплата Stars не поддерживается и не предлагается: поиск всегда передаёт
-`star_count=0`, без платных повторов или покупок. Лимит, отсутствие согласия или
-ошибка возвращаются отдельно от успешного поиска без совпадений.
+Stars payments are neither supported nor offered: search always passes
+`star_count=0`, without paid retries or purchases. Limits, missing consent, and
+errors are reported separately from a successful search with no matches.
 
-## Где находятся программа и данные
+## Program and data locations
 
-- Программа: `%LOCALAPPDATA%\Programs\TelegramMCP`, отдельная папка для каждой установленной версии.
-- Локальный каталог: `%USERPROFILE%\.agents\plugins\marketplace.json`; плагин: `%USERPROFILE%\plugins\telegram-mcp-work`.
-- Профиль: `%LOCALAPPDATA%\TelegramSearchMCPShared`, только для текущего пользователя.
-- `api_hash` и ключ шифрования базы: Windows Credential Manager. Сеанс Telegram остаётся на этом компьютере.
+- Program: `%LOCALAPPDATA%\Programs\TelegramMCP`, with a separate directory for each installed version.
+- Personal marketplace: `%USERPROFILE%\.agents\plugins\marketplace.json`; plugin: `%USERPROFILE%\plugins\telegram-mcp-work`.
+- Profile: `%LOCALAPPDATA%\TelegramSearchMCPShared`, private to the current user.
+- `api_hash` and database encryption key: Windows Credential Manager. The Telegram session stays on this computer.
 
-Не копируйте профиль, базу, секреты или установленное окружение другому человеку. Передавайте только чистый исходный архив. Каждый входит в собственный Telegram.
+Do not copy your profile, database, secrets, or installed environment to another person. Share only the clean source archive. Each person signs into their own Telegram account.
 
-## Проверка и управление
+## Verification and management
 
 ```powershell
 $tg = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Programs\TelegramMCP\tgsearch.ps1'
@@ -67,43 +69,43 @@ $tg = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Programs
 & $tg service stop
 ```
 
-Вместо удаления `tdlib.lock` остановите сервис указанной командой и дождитесь завершения текущей операции. Один общий сервис обслуживает все окна и чаты.
+Stop the service with the command above and let the current operation finish instead of deleting `tdlib.lock`. One shared service supports all windows and chats.
 
-При необходимости отправки:
+To enable sending when needed:
 
 ```powershell
 & $tg sending on
-# Перезапустите Codex или ChatGPT и начните новый чат: теперь доступны 19 инструментов.
+# Restart Codex or ChatGPT and start a new chat: 19 tools are now available.
 & $tg sending off
 ```
 
-Отправка требует вашего явного указания адресата и содержимого; подготовка, подтверждённая отправка и проверка статуса используют один `draft_id`. При `pending`/`unknown` не создавайте повторную отправку.
+Sending requires your explicit recipient and content instructions; preparation, confirmed sending, and status checks use the same `draft_id`. Do not create another send when the status is `pending` or `unknown`.
 
-## Обновление
+## Updates
 
-Скачайте новую проверенную версию и снова запустите `install-windows.ps1`. Старые версии и вход Telegram сохраняются. Новые процессы используют новую версию; активная операция общего сервиса завершается перед переключением. Перезапустите приложение после обновления.
+Download a new verified release and rerun `install-windows.ps1`. Older installed versions and your Telegram login are retained. New processes use the new version; an active shared-service operation finishes before switching. Restart the app after updating.
 
-Установщик сохраняет остальные плагины и настройки каталога. Если вы удалили или изменили регистрацию Telegram, обновление её не восстановит; результат `preserved_user_changes` сообщает об этом. Дневного автообновления Windows пока нет.
+The installer preserves other plugins and marketplace settings. If you removed or modified the Telegram registration, an update does not restore it; the result `preserved_user_changes` reports this. Daily automatic updates are not yet available on Windows.
 
-## Удаление
+## Removal
 
-Отключите/удалите Telegram MCP в Plugins. Выполните `service stop`. Удалите только запись `telegram-mcp-work` из персонального `marketplace.json` и папку `%USERPROFILE%\plugins\telegram-mcp-work`, затем папку программы. Сохранённый профиль и Credential Manager остаются для переустановки.
+Disable or remove Telegram MCP in Plugins. Run `service stop`. Remove only the `telegram-mcp-work` entry from your personal `marketplace.json` and the `%USERPROFILE%\plugins\telegram-mcp-work` directory, then remove the program directory. The saved profile and Credential Manager entries remain available for reinstallation.
 
-Для полного отзыва доступа завершите соответствующий сеанс в официальном Telegram → Настройки → Устройства. После остановки сервиса можно удалить `%LOCALAPPDATA%\TelegramSearchMCPShared` и принадлежащие ему записи `local.unofficial-telegram-search-mcp-shared` в Windows Credential Manager. Не удаляйте записи других программ.
+To revoke access completely, terminate the corresponding session in the official Telegram app → Settings → Devices. After stopping the service, you can remove `%LOCALAPPDATA%\TelegramSearchMCPShared` and its `local.unofficial-telegram-search-mcp-shared` entries in Windows Credential Manager. Do not remove other applications' entries.
 
-## Проверка установщика без входа
+## Check the installer without signing in
 
 ```powershell
 .\install-windows.ps1 -PrepareOnly -InstallDir 'C:\path\to\temporary\application' -MarketplacePath 'C:\path\to\temporary\home\.agents\plugins\marketplace.json'
 ```
 
-Этот режим предназначен для CI и проверки пакета. Он не авторизует Telegram. Не используйте временный каталог плагинов для обычной установки: Codex и ChatGPT автоматически обнаруживают каталог своего пользователя.
+This mode is for CI and package checks. It does not authorize Telegram. Do not use a temporary marketplace for a normal installation: Codex and ChatGPT automatically discover the current user's marketplace.
 
-## Для агента, выполняющего установку
+## Instructions for the installing agent
 
-Сначала прочитайте [INSTALL.md](INSTALL.md). Определите платформу и клиент, а также наличие `%LOCALAPPDATA%\Programs\TelegramMCP\windows-install.json` до установки: существующая установка требует сохранения пользовательского выбора плагинов. Не запускайте macOS-установщик или WSL для нативного Windows-клиента.
+Read [INSTALL.md](INSTALL.md) first. Identify the platform and client, and check for `%LOCALAPPDATA%\Programs\TelegramMCP\windows-install.json` before installation: existing installations require preserving the user's plugin choices. Do not run the macOS installer or WSL for a native Windows client.
 
-Этот PowerShell-блок скачивает ZIP и SHA-256 из одного конкретного последнего выпуска, сверяет их и распаковывает пакет в отдельную папку. Он не запускает установку и не запрашивает секреты:
+This PowerShell block downloads the ZIP and SHA-256 from one resolved latest release, verifies them, and extracts the package into a separate directory. It does not run the installer or request secrets:
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -127,15 +129,15 @@ if (-not (Test-Path -LiteralPath $installer)) { throw 'The release has no Window
 Write-Output $installer
 ```
 
-Запустите найденный файл в **интерактивном локальном** PowerShell:
+Run the located file in **interactive local** PowerShell:
 
 ```powershell
 powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $installer
 ```
 
-Если инструмент агента не позволяет пользователю самому вводить секреты, подготовьте пакет через `-PrepareOnly`, затем откройте локальный терминал для `tgsearch.ps1 auth` и `tgsearch.ps1 doctor --connect`. Не просите прислать `api_hash`, код или пароль в чат и не сохраняйте их в командах, логах или файлах инструкций. `-PrepareOnly` ещё не означает готовность Telegram.
+If the agent's tools do not let the user enter secrets privately, prepare the package with `-PrepareOnly`, then open a local terminal for `tgsearch.ps1 auth` and `tgsearch.ps1 doctor --connect`. Never ask for the `api_hash`, code, or password in chat, or save them in commands, logs, or instruction files. `-PrepareOnly` does not mean Telegram is ready to use.
 
-На **первой установке**, если доступен Codex CLI и `codex plugin add --help` подтверждает эту команду, агент может завершить включение плагина без ручного редактирования `config.toml`:
+On a **first installation**, if Codex CLI is available and `codex plugin add --help` confirms the command exists, the agent can finish activating the plugin without manually editing `config.toml`:
 
 ```powershell
 $marketplace = Get-Content -LiteralPath (Join-Path $env:USERPROFILE '.agents\plugins\marketplace.json') -Raw | ConvertFrom-Json
@@ -144,13 +146,13 @@ codex plugin add "telegram-mcp-work@$($marketplace.name)" --json
 if ($LASTEXITCODE -ne 0) { throw 'Plugin activation failed; use Plugins in the app.' }
 ```
 
-Если такой команды нет, используйте **Plugins → Personal → Telegram MCP** в приложении или `/plugins` в поддерживающем плагины Codex CLI. Не устанавливайте дополнительный CLI только ради этой команды. Идентификатор `telegram-mcp-work` сохранён для совместимости; этот же плагин используется в Codex. При обновлении не включайте отключённый/удалённый пользователем плагин заново и не восстанавливайте запись при `preserved_user_changes` без отдельного указания пользователя.
+If that command is unavailable, use **Plugins → Personal → Telegram MCP** in the app or `/plugins` in a Codex CLI version with plugin support. Do not install an additional CLI solely for this command. The `telegram-mcp-work` identifier is retained for compatibility; Codex uses the same plugin. During upgrades, do not reactivate a plugin the owner disabled or removed, or restore an entry after `preserved_user_changes`, without a separate request.
 
-После перезапуска проверьте появление 15 инструментов и выполните `doctor --connect`. Для проверки установки не нужно читать переписку или расходовать публичную квоту. Если пользователь отдельно попросил пробный поиск, начните с истории аккаунта. Сообщайте отдельно, что установлено и проверено, а что ещё ждёт входа Telegram, перезапуска приложения или включения плагина.
+After restarting, verify that 15 tools appear and run `doctor --connect`. Verifying installation does not require reading conversations or consuming public-search quota. If the user separately requests a trial search, start with account history. Report what is installed and verified separately from what still requires Telegram login, an app restart, or plugin activation.
 
-## Официальные источники
+## Official sources
 
-- [Локальные MCP-серверы ChatGPT desktop](https://learn.chatgpt.com/docs/extend/mcp)
-- [Плагины и локальные каталоги](https://developers.openai.com/plugins/build/plugins)
-- [Установка плагинов в Codex CLI через /plugins](https://developers.openai.com/learn/developers-codex-plugin#install-the-plugin)
-- [ChatGPT desktop на Windows](https://learn.chatgpt.com/docs/windows/windows-app)
+- [Local MCP servers in ChatGPT desktop](https://learn.chatgpt.com/docs/extend/mcp)
+- [Plugins and local marketplaces](https://developers.openai.com/plugins/build/plugins)
+- [Install plugins in Codex CLI through /plugins](https://developers.openai.com/learn/developers-codex-plugin#install-the-plugin)
+- [ChatGPT desktop on Windows](https://learn.chatgpt.com/docs/windows/windows-app)
