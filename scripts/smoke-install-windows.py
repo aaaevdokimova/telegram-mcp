@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 from pathlib import Path
 import platform
 import shutil
@@ -183,7 +184,13 @@ def main() -> None:
         configuration = plugin_configuration(marketplace, install, original)
         subprocess.run([str(first_python), "-I", "-c", MCP_DISCOVERY_CHECK, str(configuration), "sending"], check=True, timeout=60)
         configuration_before = configuration.read_bytes()
-        subprocess.run(command, check=True, timeout=600)
+        # First install inherits the runner's PowerShell 7 -> Python environment.
+        # Reinstall also works with an unrelated inherited module search path.
+        external_modules = root / 'external modules'
+        external_modules.mkdir()
+        reinstall_environment = {key: value for key, value in os.environ.items() if key.upper() != 'PSMODULEPATH'}
+        reinstall_environment['PSModulePath'] = str(external_modules)
+        subprocess.run(command, check=True, timeout=600, env=reinstall_environment)
         second = active_version(install)
         assert second != first, "Reinstallation must activate a new immutable version"
         assert first_python.is_file(), "Reinstallation must preserve the former interpreter"

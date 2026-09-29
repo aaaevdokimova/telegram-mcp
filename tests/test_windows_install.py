@@ -1,5 +1,6 @@
 """Registration edits must preserve other plugins and user customizations."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -114,10 +115,16 @@ for line in sys.stdin:
          'params': {'name': 'echo', 'arguments': {'text': unicode_text}}},
     ]
     wire = ''.join(json.dumps(request, ensure_ascii=False) + '\n' for request in requests).encode('utf-8')
+    # Reproduce an app started from another PowerShell version: its inherited
+    # module path does not contain this runtime's compatible built-in modules.
+    external_modules = tmp_path / 'external modules'
+    external_modules.mkdir()
+    child_environment = {key: value for key, value in os.environ.items() if key.upper() != 'PSMODULEPATH'}
+    child_environment['PSModulePath'] = str(external_modules)
     result = subprocess.run(
         [str(installer.powershell_path()), '-NoLogo', '-NoProfile', '-NonInteractive',
          '-ExecutionPolicy', 'Bypass', '-File', str(launcher)],
-        input=wire, capture_output=True, timeout=30, check=True,
+        input=wire, capture_output=True, timeout=30, check=True, env=child_environment,
         creationflags=subprocess.CREATE_NO_WINDOW if hidden_console else 0,
     )
     responses = [json.loads(line) for line in result.stdout.decode('utf-8').splitlines()]

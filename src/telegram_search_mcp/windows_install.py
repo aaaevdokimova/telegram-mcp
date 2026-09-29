@@ -53,6 +53,8 @@ def windows_launcher_text(root: Path, module: str) -> str:
     # user path into PowerShell code and no execution through a mutable symlink.
     return '''$ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+# An app may inherit PowerShell 7's incompatible module search path.
+$env:PSModulePath = [System.IO.Path]::Combine($PSHOME, 'Modules')
 # Keep native pipes UTF-8 when Windows PowerShell captures their output.
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 [Console]::InputEncoding = $utf8

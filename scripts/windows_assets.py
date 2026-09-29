@@ -16,6 +16,9 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+# Python launched by PowerShell 7 inherits its incompatible module search path.
+# Use only modules shipped with this PowerShell; this changes this process only.
+$env:PSModulePath = [System.IO.Path]::Combine($PSHOME, 'Modules')
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 [Console]::InputEncoding = $utf8
 [Console]::OutputEncoding = $utf8
