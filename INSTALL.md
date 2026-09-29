@@ -1,65 +1,69 @@
-# Установка по ссылке: инструкции для AI-агента
+# Install from a repository link: instructions for AI agents
 
-Этот файл — точка входа для **Codex и Gemini CLI**, когда пользователь дал ссылку
-на репозиторий и попросил «установи» или «обнови». Выполните установку, а не только
-перескажите команды. Такой запрос уже разрешает обычную подготовку зависимостей,
-настройку выбранного клиента и проверку подключения; повторное общее подтверждение
-не нужно. При просмотре кода или разработке не меняйте личную установку.
+This is the entry point for **Codex and Gemini CLI** when a user provides the
+repository link and asks to install or upgrade it. Perform the installation,
+instead of only describing commands. That request authorizes normal dependency
+setup, configuration of the selected client, and connection checks; do not ask
+for the same general permission again. Do not change a personal installation
+while reviewing or developing the code.
 
-Канонический репозиторий: https://github.com/prabchevski/telegram-mcp.
-Сначала прочитайте [AGENTS.md](AGENTS.md), затем выберите маршрут ниже.
+Canonical repository: https://github.com/prabchevski/telegram-mcp.
+Read [AGENTS.md](AGENTS.md) first, then choose the route below.
 
-## 1. Определите ОС, архитектуру и клиент
+## 1. Identify the operating system, architecture, and client
 
-Используйте сведения текущего клиента и ОС. Если пользователь не указал другой
-клиент, настраивайте тот, из которого он просит установку. Не спрашивайте то, что
-уже известно из окружения. На macOS значение `both` выбирайте только по просьбе
-настроить и Codex, и Gemini CLI.
+Use the current client's context and operating system. Unless the user names a
+different client, configure the one they are using to request installation. Do not
+ask for information already available in the environment. On macOS, select `both`
+only when asked to configure both Codex and Gemini CLI.
 
-| Окружение | Пакет и дальнейшие действия |
+| Environment | Package and next steps |
 | --- | --- |
-| macOS arm64 / x86_64, Codex app или CLI | `telegram-mcp-macos.zip`, шаги macOS ниже, `--clients codex` |
-| macOS arm64 / x86_64, Gemini CLI | `telegram-mcp-macos.zip`, шаги macOS ниже, `--clients gemini` |
-| Windows x64, Codex desktop / CLI с плагинами | `telegram-mcp-windows.zip`, [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md), личный каталог плагинов |
-| Windows x64, ChatGPT Work с локальными плагинами | Тот же Windows-пакет и [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md) |
+| macOS arm64 / x86_64, Codex app or CLI | `telegram-mcp-macos.zip`, macOS steps below, `--clients codex` |
+| macOS arm64 / x86_64, Gemini CLI | `telegram-mcp-macos.zip`, macOS steps below, `--clients gemini` |
+| Windows x64, Codex desktop / CLI with plugins | `telegram-mcp-windows.zip`, [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md), personal plugin marketplace |
+| Windows x64, ChatGPT Work with local plugins | The same Windows package and [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md) |
 
-На Windows используйте нативный 64-битный PowerShell, без WSL. Не запускайте
-macOS-установщик на Windows. Этот пакет не настраивает Gemini в браузере/на
-телефоне или обычный веб-чат ChatGPT. Linux и нативный Windows ARM64 не имеют
-готового установщика. Если клиент или платформа не подходит, объясните конкретное
-ограничение; не создавайте другой способ подключения без согласованного запроса.
+On Windows, use native 64-bit PowerShell without WSL. Do not run the macOS installer
+on Windows. This package does not configure Gemini in a browser or on a phone, or
+ordinary ChatGPT web chats. Linux and native Windows ARM64 have no ready-to-use
+installer. If the platform or client is unsupported, explain the specific
+limitation; do not create a different connection method without an agreed request.
 
-Проверьте, что выбранный клиент установлен и поддерживает этот маршрут. На Windows
-доступ к плагинам может зависеть от версии приложения и политики рабочего
-пространства. Инструкции по регистрации не доказывают, что плагин уже активен в UI.
+Check that the selected client is installed and supports this route. On Windows,
+plugin access can depend on the app version and workspace policy. Configuration
+instructions do not prove that the plugin is already active in the interface.
+See [VERIFICATION.md](VERIFICATION.md) for tested environments: the existing Windows
+CI runs on Windows Server 2025, not separate Windows 10 and Windows 11 machines.
 
-## 2. Получите опубликованный релиз и проверьте архив
+## 2. Download a published release and verify the archive
 
-Используйте **Assets последнего опубликованного релиза**, а не произвольную ветку,
-форк или стандартный GitHub `Source code (zip)`. Windows-установщик и манифесты
-плагина создаются при сборке; их нет в обычном архиве исходников GitHub.
+Use the **Assets from the latest published release**, rather than an arbitrary
+branch, fork, or GitHub's standard `Source code (zip)`. The Windows installer and
+plugin manifests are generated during packaging and are absent from GitHub's
+ordinary source archive.
 
-1. Прочитайте [последний релиз](https://github.com/prabchevski/telegram-mcp/releases/latest)
-   или публичный API `https://api.github.com/repos/prabchevski/telegram-mcp/releases/latest`.
-   GitHub-аккаунт и пользовательский токен для этого не нужны.
-2. Запомните возвращённый `tag_name` и используйте `browser_download_url` нужного
-   ZIP и его `.sha256` **из того же ответа/релиза**. После выбора не скачивайте
-   файлы через два независимых обращения к `/latest`: между ними может выйти
-   новая версия. Не используйте черновик или prerelease без явного запроса.
-3. Сохраните оба файла в новый локальный рабочий каталог. Не перезаписывайте чужой
-   checkout или старую установленную программу. До распаковки сравните SHA-256
-   архива с соответствующей строкой файла `.sha256`.
-4. Если контрольная сумма не совпала, остановите запуск, повторно получите этот же
-   релиз и проверьте загрузку. Не обходите проверку. После успешной проверки
-   распакуйте архив в отдельную папку и прочитайте поставляемые инструкции.
+1. Read the [latest release](https://github.com/prabchevski/telegram-mcp/releases/latest)
+   or its public API at `https://api.github.com/repos/prabchevski/telegram-mcp/releases/latest`.
+   No GitHub account or user token is needed.
+2. Retain the returned `tag_name` and use the `browser_download_url` for the required
+   ZIP and its `.sha256` **from the same response and release**. Once selected, do
+   not download them through two independent `/latest` requests: a release could
+   change between requests. Do not use a draft or prerelease unless explicitly asked.
+3. Save both files in a new local working directory. Do not overwrite another
+   checkout or an existing installed version. Before extracting, compare the
+   archive's SHA-256 with its entry in the matching `.sha256` file.
+4. If the checksum differs, stop execution, download that same release again, and
+   recheck it. Do not bypass verification. After a successful check, extract into
+   a separate directory and read the included instructions.
 
-В macOS проверка из каталога с обоими файлами:
+On macOS, run this from the directory containing both files:
 
 ```sh
 shasum -a 256 -c telegram-mcp-macos.zip.sha256
 ```
 
-В Windows проверка из каталога с обоими файлами:
+On Windows, run this from the directory containing both files:
 
 ```powershell
 $expectedHash = ((Get-Content -LiteralPath '.\telegram-mcp-windows.zip.sha256' -Raw).Trim() -split '\s+')[0]
@@ -67,41 +71,41 @@ $actualHash = (Get-FileHash -LiteralPath '.\telegram-mcp-windows.zip' -Algorithm
 if ($actualHash -ne $expectedHash) { throw 'Telegram MCP archive checksum mismatch' }
 ```
 
-Публикация релиза выполняется только после успешного workflow **Test and package**:
-тестов, проверки состава архивов и установщиков. Контрольная сумма подтверждает
-соответствие скачанного файла опубликованному архиву. Для установки не требуется
-заново клонировать и собирать ветку `main` или запускать тесты на аккаунте пользователя.
+Releases are published only after the **Test and package** workflow succeeds,
+including tests, archive-content checks, and installer checks. The checksum
+confirms that the downloaded file matches the published archive. Installation
+does not require cloning and rebuilding `main` or running tests on the user's account.
 
-## 3. Сохраните существующие настройки
+## 3. Preserve existing settings
 
-Проверяйте только относящиеся к Telegram MCP записи клиента и маркеры установки.
-Не печатайте целые конфигурационные файлы: в них могут быть чужие ключи и настройки.
-Используйте выбранные пользователем каталоги конфигурации. Сохраняйте остальные
-MCP-серверы, плагины и настройки.
+Inspect only the client entries and installation markers related to Telegram MCP.
+Do not print entire configuration files: they may contain other credentials or
+settings. Respect the user's configuration directories. Preserve other MCP
+servers, plugins, and settings.
 
-Совместимые сохранённые профили используют **на месте**. Нельзя копировать базу,
-сеанс или ключи между компьютерами/пользователями. При двух разных старых аккаунтах
-нужен выбор владельца, поскольку объединять их нельзя. При ручных изменениях
-регистрации сохраните их и сообщите конкретный конфликт; не удаляйте настройки,
-чтобы установщик «прошёл».
+Reuse compatible saved profiles **in place**. Never copy databases, sessions, or
+keys between computers or users. If two old installations use different accounts,
+ask the owner to choose; the accounts cannot be merged. Preserve manual registration
+changes and report the specific conflict; do not delete settings to make the
+installer succeed.
 
-Если профиль занят, дайте завершиться активным Telegram-запросам и освободите
-его штатной остановкой сервиса/старого клиента. Никогда не удаляйте `tdlib.lock`,
-не копируйте живую базу и не завершайте посторонние процессы.
+If a profile is busy, let active Telegram requests finish and release it by stopping
+the service or old client normally. Never delete `tdlib.lock`, copy a live database,
+or terminate unrelated processes.
 
-## 4. Выполните установку для выбранной платформы
+## 4. Install for the selected platform
 
-### macOS: Codex или Gemini CLI
+### macOS: Codex or Gemini CLI
 
-Установщику нужны Homebrew и рабочие Apple command-line tools. Он устанавливает uv,
-Python 3.13 и зависимости из `uv.lock`. TDLib 1.8.67 закреплён версией и commit:
-Apple Silicon использует проверяемый wheel; Intel собирает официальный исходник
-с cmake, gperf и OpenSSL один раз, что может занять несколько минут.
-Если Homebrew или инструменты Apple отсутствуют, помогите установить их по
-официальным инструкциям. Системные пароли и диалоги остаются в локальном UI
-владельца. Не меняйте права системного Python и чужие Python-окружения.
+The installer requires Homebrew and working Apple command-line tools. It installs
+uv, Python 3.13, and the dependencies in `uv.lock`. TDLib 1.8.67 is pinned by version
+and commit: Apple Silicon uses a verified wheel; Intel builds the official source
+once with cmake, gperf, and OpenSSL, which can take several minutes.
+If Homebrew or Apple's tools are missing, help install them using their official
+instructions. System passwords and dialogs stay in the owner's local interface.
+Do not change system Python permissions or unrelated Python environments.
 
-Из распакованного каталога выполните одну команду:
+From the extracted directory, run one command:
 
 ```sh
 # Codex
@@ -113,88 +117,90 @@ bash install-macos.command --clients codex --prepare-only --upgrade --auto-updat
 bash install-macos.command --clients gemini --prepare-only --upgrade --auto-update on
 ```
 
-Используйте `--clients both`, только если нужны оба клиента. Если пользователь
-попросил фиксированную версию или отключить автообновления, замените
-`--auto-update on` на `--auto-update off`.
+Use `--clients both` only when both clients are requested. If the user requested
+a fixed version or disabled automatic updates, replace `--auto-update on` with
+`--auto-update off`.
 
-`--prepare-only` оставляет первый вход для локального окна владельца.
-`--upgrade` также обновляет распознанные существующие Telegram-регистрации во
-втором клиенте, но не включает отсутствующий клиент. Учитывайте `CODEX_HOME` и
-`GEMINI_CLI_HOME` либо передайте абсолютные `--codex-config` / `--gemini-config`.
-Установщик сохраняет приватные резервные копии и остальные записи MCP.
+`--prepare-only` leaves the first login for the owner's local window.
+`--upgrade` also updates recognized existing Telegram registrations in the other
+client, but does not enable a client that was not configured. Respect `CODEX_HOME`
+and `GEMINI_CLI_HOME`, or pass absolute `--codex-config` / `--gemini-config` paths.
+The installer retains private backups and preserves other MCP entries.
 
-Используйте **напечатанный установщиком корень программы**. Обычно это
-`~/Applications/TelegramSearchMCP`; при старой Codex 0.2 установке —
-`~/Applications/TelegramSearchMCPShared`. Не удаляйте предыдущую программу.
-Совместимые профили Codex 0.2 и Gemini 0.3 сохраняют Keychain namespace; настроенный
-общий профиль 0.4 имеет приоритет. Если старые аккаунты различаются, уточните
-выбор и повторите с `--migrate-profile codex` или `--migrate-profile gemini`.
-`--migrate-profile none` не принимает старый профиль, когда общего ещё нет.
-Подробности: [миграция и обновления macOS](INSTALL_MACOS.md).
+Use **the installation root printed by the installer**. It is usually
+`~/Applications/TelegramSearchMCP`; an old Codex 0.2 installation uses
+`~/Applications/TelegramSearchMCPShared`. Do not delete the previous installation.
+Compatible Codex 0.2 and Gemini 0.3 profiles retain their Keychain namespace; an
+already configured shared 0.4 profile takes precedence. If old accounts differ,
+ask the owner to choose and retry with `--migrate-profile codex` or
+`--migrate-profile gemini`. `--migrate-profile none` declines an old profile when
+no shared profile exists yet. See [macOS migration and upgrades](INSTALL_MACOS.md).
 
-### Windows: Codex или ChatGPT Work
+### Windows: Codex or ChatGPT Work
 
-Выполните [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md) с проверенным Windows-архивом.
-Используйте описанный там режим подготовки без входа, затем отдельное локальное
-окно авторизации. Оба приложения используют **личный каталог плагинов**; не
-добавляйте параллельную регистрацию того же сервера вручную в Codex TOML.
-Установщик подготавливает uv, Python, закреплённую TDLib и плагин. В поддерживающем
-плагины Codex CLI доступен `/plugins`; возможность автоматического включения
-проверяйте по инструкции, а при обновлении сохраняйте выбор владельца.
+Follow [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md) using the verified Windows archive.
+Use its preparation mode without login, then open a separate local authorization
+window. Both apps use the **personal plugin marketplace**; do not manually add a
+duplicate server registration in Codex TOML.
+The installer prepares uv, Python, pinned TDLib, and the plugin. Codex CLI versions
+with plugin support provide `/plugins`; follow the guide to check whether automatic
+activation is available, and preserve the owner's choices during upgrades.
 
-Штатный путь программы — `%LOCALAPPDATA%\Programs\TelegramMCP`; стабильные
-точки входа — `tgsearch.ps1` и `launch-mcp.ps1`. Сохраняйте напечатанный установщиком
-путь, если он отличается. После подготовки плагин нужно включить в приложении.
-Не утверждайте, что установка в личный каталог уже означает активный плагин в чате.
+The default installation path is `%LOCALAPPDATA%\Programs\TelegramMCP`; its stable
+entry points are `tgsearch.ps1` and `launch-mcp.ps1`. Retain the path printed by the
+installer if it differs. After preparation, enable the plugin in the app.
+Do not claim that a marketplace entry already means the plugin is active in a chat.
 
-## 5. Проверьте сохранённый вход или откройте локальную авторизацию
+## 5. Check an existing login or open local authorization
 
-Сначала запустите `tgsearch doctor`, затем, если подготовка готова,
-`tgsearch doctor --connect` через установленную точку входа. Эти команды проверяют
-настройку и авторизацию без вывода секретов. Не читайте переписку, не запускайте
-публичный поиск, расшифровку или отправку ради проверки установки.
+First run `tgsearch doctor`, then, when preparation is complete,
+`tgsearch doctor --connect` through the installed entry point. These commands
+check setup and authorization without printing secrets. Do not read conversations,
+run public searches, transcribe messages, or send anything to verify installation.
 
-Если вход отсутствует или истёк, откройте `authorize.command` на macOS либо
-описанный в Windows-инструкции запуск `tgsearch.ps1 auth` **в отдельном локальном
-окне владельца**. На macOS для этого подходит `open` файла `authorize.command`.
-Не выполняйте интерактивный вход в терминале агента с записываемым выводом и не
-снимайте окно авторизации. Владелец вводит свои `api_id`/`api_hash` с
-[my.telegram.org](https://my.telegram.org), сканирует QR, при необходимости вводит
-код и пароль 2FA. Никогда не просите прислать секреты, QR или login link в AI-чат.
+If login is missing or expired, open `authorize.command` on macOS, or run
+`tgsearch.ps1 auth` as described in the Windows guide, **in a separate local window
+for the owner**. On macOS, `open` can launch `authorize.command`.
+Do not run interactive authorization in an agent terminal with recorded output
+or capture the authorization window. The owner enters their own `api_id` and
+`api_hash` from [my.telegram.org](https://my.telegram.org), scans the QR code, and
+enters a login code or 2FA password if needed. Never ask for secrets, QR codes,
+or login links in the AI chat.
 
-Подготовьте всё, что не требует входа, прежде чем сообщать об оставшемся действии
-владельца. После его завершения повторите `doctor --connect`. Если приложение
-нужно перезапустить для продолжения, явно сообщите, что уже проверено и что
-потребует проверки в новом чате. Не выдавайте отсутствие авторизации за успех.
+Complete everything that does not require login before reporting the remaining
+owner action. After authorization, repeat `doctor --connect`. If continuing
+requires an app restart, explain what has been checked and what must be verified
+in a new chat. Do not report missing authorization as success.
 
-## 6. Проверьте MCP и сообщите результат
+## 6. Verify MCP and report the result
 
-- Подтвердите установленную версию через `tgsearch --version` и состояние сервиса.
-- На macOS выполните `current/client-config verify --clients codex` (или `gemini` /
-  `both`) с теми же нестандартными путями конфигурации, если они использовались.
-  Проверьте `current/tgsearch updates status`.
-- На Windows проверьте запись в личном каталоге и установленный плагин. Если
-  требуется перезапуск приложения, подготовьте всё остальное и оставьте одну
-  понятную инструкцию: перезапустить, включить Telegram MCP и открыть новый чат.
-- Выполните MCP initialization и `tools/list`, когда доступно: **15 инструментов**
-  по умолчанию, **19** при ранее включённой отправке. Для этого не нужно читать
-  сообщения. Регистрация файла сама по себе не является проверкой MCP-соединения.
-- Проверьте `doctor --connect` после входа. Не запускайте старую TDLib против базы,
-  уже обновлённой новой версией. Активные операции сервиса должны завершиться до
-  смены версии; новый клиент может штатно заменить простаивающий старый сервис.
-- В ответе укажите ОС и клиент, версию/релиз, реальный путь установки, сохранённый
-  или новый вход, результаты проверок, режим обновления и оставшееся действие.
-  Различайте «подготовлено», «вход подтверждён» и «инструменты доступны в клиенте».
+- Confirm the installed version with `tgsearch --version` and check service status.
+- On macOS, run `current/client-config verify --clients codex` (or `gemini` /
+  `both`) using the same custom configuration paths, if applicable.
+  Check `current/tgsearch updates status`.
+- On Windows, check the personal marketplace entry and installed plugin. If the
+  app needs a restart, complete everything else and leave one clear instruction:
+  restart, enable Telegram MCP, and open a new chat.
+- Perform MCP initialization and `tools/list` when available: **15 tools** by
+  default, **19** if sending was already enabled. This does not require reading
+  messages. Writing a registration file alone does not verify an MCP connection.
+- Check `doctor --connect` after login. Do not run old TDLib against a database
+  already upgraded by a newer version. Active service operations must finish
+  before switching versions; a new client can replace an idle old service normally.
+- Report the operating system and client, version/release, actual installation
+  path, preserved or new login, checks completed, update mode, and remaining action.
+  Distinguish “prepared”, “login verified”, and “tools available in the client”.
 
-Напомните коротко: сначала поиск по истории/подпискам, затем при необходимости
-проверка живой бесплатной квоты публичного поиска, объяснение расхода и явное
-согласие перед новым запросом. Проверка квоты не расходует попытку; Stars не
-предлагаются. Эти инструкции MCP передаёт каждому клиенту сам.
+Briefly explain the search workflow: search history and subscriptions first; if
+broader public search would help, check the live free quota, explain any attempt
+it would consume, and obtain explicit permission for the new query. Checking the
+quota uses no search attempt; never offer Stars payments. MCP itself sends these
+instructions to each client.
 
-macOS по умолчанию проверяет `main` ежедневно, только после успешного CI на точном
-commit. Обновление сохраняет вход, оставляет отдельные версии и не прерывает
-активную работу. Windows в этой версии обновляется вручную запуском нового
-проверенного релиза. Пользователь может отключить ежедневные обновления macOS
-через `current/tgsearch updates off`. Особенности старых версий и восстановления
-изменённой регистрации описаны в [INSTALL_MACOS.md](INSTALL_MACOS.md) и
-[INSTALL_WINDOWS.md](INSTALL_WINDOWS.md).
+By default, macOS checks `main` daily and only installs a commit after its CI
+succeeds. Updates preserve login, keep separate installed versions, and let active
+work finish. This version of Windows updates manually by running a new verified
+release's installer. Users can disable daily macOS updates with
+`current/tgsearch updates off`. See [INSTALL_MACOS.md](INSTALL_MACOS.md) and
+[INSTALL_WINDOWS.md](INSTALL_WINDOWS.md) for older versions and recovery of
+modified registrations.

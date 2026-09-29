@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.2 — 2026-09-29
+
+- Make all user-facing documentation, installation instructions and examples English, including the README, quick start and both platform guides.
+- Record the actual Windows edition, build and architecture during installer verification. Desktop-specific checks reject Windows Server and the wrong desktop version instead of treating them as equivalent.
+- Add isolated Windows 10 and Windows 11 desktop installation checks; see VERIFICATION.md for the measured results and remaining client UI acceptance scope.
+
 ## 0.9.1 — 2026-09-29
 
 - Publish the Windows x64 installer for both Codex desktop and ChatGPT Work, alongside the macOS installer for Codex and Gemini CLI. This is the first published release of the Windows and public-search changes developed in 0.9.0.

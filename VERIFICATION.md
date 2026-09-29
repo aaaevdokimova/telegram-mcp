@@ -1,5 +1,21 @@
 # Verification
 
+## Version 0.9.2 — English documentation and Windows desktop verification
+
+All installation guides and user-facing examples are in English. Unicode fixture
+content and paths remain in tests to verify non-ASCII messages and user folders.
+
+Windows installer verification records the real operating-system edition, display
+version, build and architecture. A desktop acceptance run must identify Windows 10
+or Windows 11 explicitly and reject Windows Server. The earlier `windows-latest`
+checks ran on **Windows Server 2025**, not either desktop edition.
+
+The Windows 10/11 desktop acceptance results will be recorded here after the
+corresponding virtual-machine runs complete. These checks use disposable programs,
+profiles and client configuration, with no real Telegram login or search quota.
+Real Codex/ChatGPT UI activation and the owner's Telegram login are separate from
+the installer and MCP protocol checks.
+
 ## Version 0.9.1 — Windows release, public-search quota and explicit consent
 
 This change adds a read-only quota operation and requires a fresh account/query/
