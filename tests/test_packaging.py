@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -27,6 +28,7 @@ def source(tmp_path: Path) -> Path:
         target.write_text("# Public release source\n")
     (project / "pyproject.toml").write_text('[project]\nname="telegram-search-mcp"\nversion="0.4.0"\n')
     (project / "src/telegram_search_mcp/__init__.py").write_text('__version__ = "0.4.0"\n')
+    (project / release.WINDOWS_ASSETS_SOURCE).write_bytes((ROOT / release.WINDOWS_ASSETS_SOURCE).read_bytes())
     return project
 
 
@@ -40,7 +42,7 @@ def test_archive_is_deterministic_and_has_complete_inventory(source: Path, tmp_p
     assert first.read_bytes() == second.read_bytes()
     assert first.name == "telegram-mcp-macos-v0.4.0.zip"
     manifest = release.verify_archive(first)
-    assert {item["path"] for item in manifest["files"]} == release.REQUIRED_FILES
+    assert {item["path"] for item in manifest["files"]} == release.REQUIRED_FILES | release.DERIVED_FILES
     assert first.with_suffix(".zip.sha256").read_text() == f"{hashlib.sha256(first.read_bytes()).hexdigest()}  {first.name}\n"
     assert json.loads(first.with_suffix(".manifest.json").read_text()) == manifest
     with zipfile.ZipFile(first) as archive:
@@ -100,7 +102,7 @@ def test_symlinks_cannot_import_external_data(source: Path, tmp_path: Path, dire
 
 def test_archive_tampering_is_detected(source: Path, tmp_path: Path) -> None:
     original = release.build(source, tmp_path / "dist")
-    payload = release.inventory(source)
+    payload = release.archive_payload(release.inventory(source))
     payload[release.MANIFEST_NAME] = release.manifest_bytes(payload)
     payload["README.md"] = b"Replaced by a different document\n"
     modified = tmp_path / "tampered.zip"
@@ -125,7 +127,7 @@ def test_extracted_bundle_can_run_inventory_and_build(source: Path, tmp_path: Pa
 
 @pytest.mark.parametrize("name", ["../outside.md", "src/../../outside.py", "/absolute.md", "a\\b.md"])
 def test_archive_path_traversal_is_rejected(source: Path, tmp_path: Path, name: str) -> None:
-    payload = release.inventory(source)
+    payload = release.archive_payload(release.inventory(source))
     payload[release.MANIFEST_NAME] = release.manifest_bytes(payload)
     payload[name] = b"untrusted"
     archive = tmp_path / "unsafe.zip"
@@ -144,6 +146,52 @@ def test_real_repository_passes_allowlist_and_data_guard() -> None:
     payload = release.inventory(ROOT)
     assert "src/telegram_search_mcp/server.py" in payload
     assert "tests/test_packaging.py" in payload
+
+
+def test_git_source_omits_derived_files_required_by_the_old_updater() -> None:
+    if (ROOT / ".git").exists():
+        assert not any((ROOT / name).exists() for name in release.DERIVED_FILES)
+    assert release.DERIVED_FILES.isdisjoint(release.inventory(ROOT))
+
+
+def test_generated_windows_assets_match_source_and_package_version(source, tmp_path):
+    archive_path = release.build(source, tmp_path / "dist")
+    expected = release.windows_assets(release.inventory(source))
+    with zipfile.ZipFile(archive_path) as archive:
+        for name, content in expected.items():
+            assert archive.read(release.PACKAGE_ROOT + "/" + name) == content
+    manifest = json.loads(expected["plugins/telegram-mcp-work/.codex-plugin/plugin.json"])
+    assert manifest["version"] == "0.4.0"
+
+
+@pytest.mark.parametrize("change", ["modified", "missing"])
+def test_even_a_rehashed_archive_cannot_change_derived_assets(source, tmp_path, change):
+    payload = release.archive_payload(release.inventory(source))
+    if change == "modified":
+        payload["install-windows.ps1"] += b"Write-Output 'unexpected'\n"
+    else:
+        payload.pop("install-windows.ps1")
+    payload[release.MANIFEST_NAME] = release.manifest_bytes(payload)
+    archive_path = tmp_path / "modified.zip"
+    release.write_zip(archive_path, payload)
+    with pytest.raises(release.ReleaseError, match="Generated Windows assets"):
+        release.verify_archive(archive_path)
+
+
+def test_windows_asset_source_is_parsed_without_executing_code(source):
+    (source / release.WINDOWS_ASSETS_SOURCE).write_text("raise RuntimeError('must never execute')\n")
+    with pytest.raises(release.ReleaseError, match="Invalid reviewed Windows assets"):
+        release.inventory(source)
+
+
+def test_legacy_smoke_snapshot_is_exactly_the_git_source_inventory(source, tmp_path):
+    spec = importlib.util.spec_from_file_location("legacy_smoke", ROOT / "scripts/smoke-upgrade-06.py")
+    smoke = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(smoke)
+    archive_path = release.build(source, tmp_path / "dist")
+    with zipfile.ZipFile(io.BytesIO(smoke.codeload_snapshot(archive_path, release))) as archive:
+        actual = {item.filename.split("/", 1)[1]: archive.read(item) for item in archive.infolist()}
+    assert actual == release.inventory(source)
 
 
 @pytest.mark.parametrize("license_state", ["matching", "missing", "changed"])

@@ -5,6 +5,7 @@ import tomllib
 import pytest
 
 from telegram_search_mcp.codex_config import apply_safety_settings
+from telegram_search_mcp.tool_catalog import DEFAULT_TOOLS
 
 
 def test_apply_safety_settings_updates_only_telegram_table(tmp_path) -> None:
@@ -24,12 +25,8 @@ def test_apply_safety_settings_updates_only_telegram_table(tmp_path) -> None:
     assert result["mcp_servers"]["other"] == {"command": "keep-me"}
     telegram = result["mcp_servers"]["telegram_search"]
     assert telegram["command"] == "/tmp/tgsearch-mcp"
-    assert telegram["enabled_tools"] == [
-        "telegram_search_messages",
-        "telegram_get_message",
-        "telegram_get_context",
-        "telegram_get_media",
-    ]
+    assert telegram["enabled_tools"] == list(DEFAULT_TOOLS)
+    assert "telegram_search_public_posts" in telegram["enabled_tools"]
     assert telegram["default_tools_approval_mode"] == "prompt"
     assert telegram["supports_parallel_tool_calls"] is False
     assert telegram["startup_timeout_sec"] == 20

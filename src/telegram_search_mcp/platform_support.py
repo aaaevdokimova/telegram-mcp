@@ -127,7 +127,7 @@ def _windows_open(path: Path, *, writable: bool, create: bool = False, exclusive
         win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE | win32con.FILE_SHARE_DELETE,
         _security_attributes() if create else None,
         win32con.CREATE_NEW if exclusive else win32con.OPEN_ALWAYS if create else win32con.OPEN_EXISTING,
-        win32con.FILE_FLAG_OPEN_REPARSE_POINT | (win32con.FILE_FLAG_BACKUP_SEMANTICS if directory else 0), None)
+        win32file.FILE_FLAG_OPEN_REPARSE_POINT | (win32con.FILE_FLAG_BACKUP_SEMANTICS if directory else 0), None)
     except pywintypes.error as exc:
         if getattr(exc, "winerror", None) in {2, 3}:
             raise FileNotFoundError(errno.ENOENT, "File not found", str(path)) from exc
@@ -341,7 +341,7 @@ def replace_private_file(source: Path, target: Path) -> None:
     if IS_WINDOWS:
         import win32con
         import win32file
-        win32file.MoveFileEx(str(source), str(target), win32con.MOVEFILE_REPLACE_EXISTING | win32con.MOVEFILE_WRITE_THROUGH)
+        win32file.MoveFileEx(str(source), str(target), win32con.MOVEFILE_REPLACE_EXISTING | win32file.MOVEFILE_WRITE_THROUGH)
     else:
         os.replace(source, target)
 

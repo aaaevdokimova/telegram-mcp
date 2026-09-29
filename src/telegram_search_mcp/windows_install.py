@@ -109,8 +109,11 @@ def _plugin_files(source: Path, root: Path, marketplace: Path) -> dict[Path, byt
     if marketplace.name != "marketplace.json" or marketplace.parent.name != "plugins" or marketplace.parent.parent.name != ".agents":
         raise ValueError("Marketplace path must end in .agents/plugins/marketplace.json")
     directory = marketplace.parents[2] / "plugins" / PLUGIN_NAME
-    template = source / "plugins" / PLUGIN_NAME
-    manifest = (template / ".codex-plugin/plugin.json").read_bytes()
+    release = _release_module(source)
+    # Raw Git snapshots intentionally omit generated JSON/PowerShell files so
+    # deployed macOS 0.6.1 updaters can still accept the source tree unchanged.
+    assets = release.windows_assets(release.inventory(source))
+    manifest = assets["plugins/" + PLUGIN_NAME + "/.codex-plugin/plugin.json"]
     config = {"mcpServers": {"telegram": {
         "command": str(powershell_path()),
         "args": ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(root / "launch-mcp.ps1")],
@@ -135,10 +138,17 @@ def _unchanged_registration(receipt: dict, marketplace: Path) -> bool:
     return bool(receipt.get("plugin_files"))
 
 
-def _copy_source(source: Path, destination: Path) -> None:
+def _release_module(source: Path):
     spec = importlib.util.spec_from_file_location("telegram_release", source / "scripts/release.py")
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Release inventory helper is missing")
     release = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(release)
+    return release
+
+
+def _copy_source(source: Path, destination: Path) -> None:
+    release = _release_module(source)
     # Complete allowlist/data audit before copying any program file.
     payload = release.inventory(source)
     for name, content in payload.items():

@@ -304,6 +304,22 @@ class TDLibBackend(WorkflowMethods):
         self._session_lock = threading.RLock()
         self._operation_lock = threading.Lock()
         self._outbox = None
+        from .public_posts import PublicPostSearch
+        self._public_posts = PublicPostSearch()
+
+    async def search_public_posts(self, *, query: str, cursor: str | None, limit: int) -> dict:
+        return await asyncio.to_thread(self._search_public_posts_sync, query=query, cursor=cursor, limit=limit)
+
+    def _search_public_posts_sync(self, *, query: str, cursor: str | None, limit: int) -> dict:
+        if SCHEMA is not TdlibSchema.CURRENT:
+            return self._public_posts.search(None, query=query, cursor=cursor, limit=limit, schema=SCHEMA)
+        policy = Policy.load(self.profile)
+        with self._operation_lock:
+            session = self._ready(policy)
+            result = self._public_posts.search(session, query=query, cursor=cursor, limit=limit,
+                                               schema=SCHEMA, timeout=OPERATION_TIMEOUT)
+            self._verify_profile(policy, session)
+            return result
 
     async def search_messages(
         self, *, query: str, cursor: str | None, limit: int

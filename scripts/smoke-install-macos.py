@@ -44,17 +44,20 @@ async def main():
             'telegram_get_message_thread',
             'telegram_get_chat_draft',
             'telegram_get_scheduled_messages',
+            'telegram_search_public_posts',
 
         }
         sending = len(sys.argv) > 2 and sys.argv[2] == 'sending'
         if sending:
             expected.update({'telegram_prepare_message', 'telegram_send_message', 'telegram_get_send_status', 'telegram_set_chat_draft'})
         assert {tool.name for tool in result.tools} == expected
-        assert len(result.tools) == (17 if sending else 13)
+        assert len(result.tools) == (18 if sending else 14)
         for tool in result.tools:
             assert tool.annotations is not None
-            assert tool.annotations.read_only_hint is (tool.name not in {'telegram_prepare_message', 'telegram_send_message', 'telegram_transcribe_voice', 'telegram_download_file', 'telegram_set_chat_draft'})
+            assert tool.annotations.read_only_hint is (tool.name not in {'telegram_prepare_message', 'telegram_send_message', 'telegram_transcribe_voice', 'telegram_download_file', 'telegram_set_chat_draft', 'telegram_search_public_posts'})
             assert tool.annotations.destructive_hint is (tool.name == 'telegram_set_chat_draft')
+            if tool.name == 'telegram_search_public_posts':
+                assert tool.annotations.idempotent_hint is False
 
 # Initialize/list only: never invoke a tool or ask the service to connect.
 asyncio.run(main())

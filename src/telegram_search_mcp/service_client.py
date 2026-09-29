@@ -292,6 +292,9 @@ class SharedTelegramBackend(WorkflowMethods):
     async def _workflow(self, operation: str, params: dict) -> dict:
         return await self._call(operation, params)
 
+    async def search_public_posts(self, *, query: str, cursor: str | None, limit: int) -> dict:
+        return await self._call("search_public_posts", {"query": query, "cursor": cursor, "limit": limit})
+
     async def search_messages(self, *, query: str, cursor: str | None, limit: int) -> RawMessagePage:
         return await self._call("search_messages", {"query": query, "cursor": cursor, "limit": limit})
 

@@ -15,7 +15,7 @@ Do not change the developer's real Telegram profile, Keychain, client settings, 
 LaunchAgents while implementing repository changes.
 
 - Preserve the original four read tools and their limits; current discovery is
-  13 tools by default (including navigation, downloads and voice), 17 with sending.
+  14 tools by default (including free public posts search, navigation, downloads and voice), 18 with sending.
 - Never add credentials, session databases, runtime data, or installed environments.
 - Keep source archives allowlisted and Python dependencies locked in uv.lock.
 - Keep installed versions separate; resolve current before starting Python.

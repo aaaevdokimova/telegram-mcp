@@ -15,22 +15,10 @@ ENV_COMMAND = "/usr/bin/env"
 SAFE_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
 SAFE_LANG = "en_US.UTF-8"
 SERVER_MODULE = "telegram_search_mcp.server"
-TOOLS = (
-    "telegram_search_messages",
-    "telegram_get_message",
-    "telegram_get_context",
-    "telegram_get_media",
-    "telegram_list_voice_messages",
-    "telegram_transcribe_voice",
-    "telegram_list_chats",
-    "telegram_get_chat_history",
-    "telegram_search_chat_messages",
-    "telegram_download_file",
-    "telegram_get_message_thread",
-    "telegram_get_chat_draft",
-    "telegram_get_scheduled_messages",
-)
-DESCRIPTION = "Local Telegram chat history, files and voice transcription (unofficial)"
+from .tool_catalog import DEFAULT_TOOLS
+
+TOOLS = DEFAULT_TOOLS
+DESCRIPTION = "Local Telegram history, free public posts search, files and voice transcription (unofficial)"
 TIMEOUT_MS = 150_000
 RegistrationState = Literal["absent", "refresh", "exact"]
 

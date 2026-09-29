@@ -28,6 +28,7 @@ from .models import (
     MessageRecord,
     MessageResult,
     MessageSearchResult,
+    PublicPostSearchResult,
     UntrustedText,
     OutgoingResult, VoiceMessagePage, TranscriptionResult,
 )
@@ -92,6 +93,22 @@ def create_server(backend: TelegramBackend, *, enable_sending: bool = False) -> 
             requested_limit=limit,
             next_cursor=page.next_cursor,
         )
+
+    @mcp.tool(title="Search public Telegram channel posts", annotations=ToolAnnotations(
+        read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=True))
+    async def telegram_search_public_posts(
+        query: SearchQuery, cursor: SearchCursor = None, limit: SearchLimit = 20,
+    ) -> PublicPostSearchResult:
+        """Search public channel posts beyond joined chats, using free searches only.
+
+        Can consume Telegram's free search quota; never spends Stars. Every call
+        checks limits first and performs at most one native search. Unavailable
+        or unsupported status is not an empty successful search. Use next_cursor
+        even for a short/empty page; cursors expire with the local service. No
+        channels are joined, messages marked read, or attachments downloaded.
+        """
+        result = await backend.search_public_posts(query=_required_nonblank(query, "query"), cursor=cursor, limit=limit)
+        return PublicPostSearchResult.model_validate(result)
 
     @mcp.tool(title="Get a Telegram message", annotations=READ_ONLY)
     async def telegram_get_message(chat_id: int, message_id: MessageId) -> MessageResult:

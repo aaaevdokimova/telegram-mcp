@@ -3,12 +3,12 @@
 Browse and search Telegram chats, download files, transcribe voice messages, and optionally
 save drafts, reply, or schedule text and files with
 **ChatGPT Work on Windows x64** and **Codex and Gemini CLI on macOS**.
-One installation and one Telegram login serve both clients at the same time.
+One installation and one Telegram login serve multiple client sessions at the same time.
 This is an unofficial project. Gemini's web and mobile apps are not supported.
 
 ## ChatGPT Work on Windows
 
-Native Windows x64 support is available through a local desktop plugin. Download or clone this source, then run `install-windows.ps1` in 64-bit PowerShell. The installer downloads a checksum-pinned uv runtime, installs Python 3.13 and locked dependencies, verifies TDLib, and adds Telegram MCP to your personal plugin marketplace. Sign in to **your own** Telegram account locally, restart ChatGPT, then install **Telegram MCP** from **Plugins → Personal** in Work.
+Native Windows x64 support is available through a local desktop plugin. Download the verified `telegram-mcp-windows.zip` release asset, extract it, then run `install-windows.ps1` in 64-bit PowerShell. The installer downloads a checksum-pinned uv runtime, installs Python 3.13 and locked dependencies, verifies TDLib, and adds Telegram MCP to your personal plugin marketplace. Sign in to **your own** Telegram account locally, restart ChatGPT, then install **Telegram MCP** from **Plugins → Personal** in Work.
 
 See [the Windows guide](INSTALL_WINDOWS.md) for the exact command, prerequisites, updates, sending, and removal. No WSL, public MCP endpoint, or tunnel is required. Windows updates are manual in this release. Native Windows ARM64 and ChatGPT web are outside this installation path. End-to-end use inside Windows ChatGPT still requires a user acceptance check; automated checks cover the native runtime, isolated installation and MCP transport.
 
@@ -35,7 +35,8 @@ See the [quick start](START_HERE.md).
 
 | Tool | Result |
 | --- | --- |
-| `telegram_search_messages` | Search accessible cloud chats, with up to 20 results and a cursor for the next page |
+| `telegram_search_messages` | Search the linked account's accessible cloud-chat history, up to 20 results per page |
+| `telegram_search_public_posts` | Search public channel posts by text, including channels you have not joined, using only free requests |
 | `telegram_get_message` | Retrieve one message by chat and message IDs |
 | `telegram_get_context` | Retrieve up to five supported text or voice/video-note messages on either side of an anchor |
 | `telegram_get_media` | Retrieve a photo, supported audio, PDF, or video thumbnail; previews up to 2 MiB, full media up to 12 MiB |
@@ -84,6 +85,44 @@ media are rejected. The original inline preview/full-media tools retain their
 2 MiB/12 MiB limits. Downloads are explicit local writes, so their MCP annotation
 is not read-only.
 
+## Free public channel post search
+
+Use `telegram_search_public_posts(query, cursor?, limit=20)` for public channel
+publications without knowing a channel username or joining it. For example:
+**«Найди публичные публикации Telegram по теме искусственный интеллект, включая каналы, на которые я не подписан».**
+
+This is a separate search scope: `telegram_search_messages` searches the account's
+accessible cloud history; `telegram_search_chat_messages` searches one known chat;
+`telegram_search_public_posts` searches Telegram's public channel index. It is not
+an exhaustive search of every Telegram message.
+
+Each public search checks `getPublicPostSearchLimits` first and makes at most one
+`searchPublicPosts` request, always with `star_count=0`. There is no payment
+argument, Stars purchase, paid retry or hidden extra page request. A new free
+query can consume a free-quota slot, so the tool is annotated as a non-read-only operation and does not
+claim to be idempotent. Sending need not be enabled.
+
+The result distinguishes `ok`, `unavailable`, `unsupported_feature`, and `failed`
+from a successful zero-match response. Quota fields include
+`remaining_free_query_count`, `next_free_query_in`, `is_current_query_free` and
+`star_count` (informational price only). A quota change between checking and
+searching returns an explicit limit outcome. Telegram's account/access rules
+still apply. An older unsupported TDLib returns `unsupported_feature` and needs an update.
+
+Results contain bounded untrusted text/channel metadata and a public link only
+when confirmed by Telegram. No joining, read-state changes, attachment downloads
+or sending occur. Use `next_cursor` exactly with the same query; short or empty
+pages can still have a continuation. Cursors are bound to the account and search
+kind; they expire after ten minutes or when the shared service restarts. Each cursor
+can be successfully consumed once. Do not interpret a limit,
+partial result or failed request as proof that a post does not exist.
+
+The implementation is shared across platforms; CI covers macOS, Windows and Linux
+core behavior. Packaged desktop installation is provided for macOS and Windows.
+
+Official contracts: [searchPublicPosts](https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1search_public_posts.html),
+[publicPostSearchLimits](https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1public_post_search_limits.html).
+
 ## Voice messages and Telegram transcription
 
 | Tool | Result |
@@ -109,8 +148,8 @@ accepted it, the result can remain pending and needs manual checking in Telegram
 Protected, self-destructing, and secret-chat messages are excluded. Text is bounded
 to 32,000 characters, with an explicit truncation flag, and is untrusted content.
 
-The default tool set contains 13 tools; enabling sending makes 17.
-Unchanged standard 0.7 registrations migrate to the new tools while preserving sending preferences.
+The default tool set contains 14 tools; enabling sending makes 18.
+Unchanged standard 0.7/0.8 registrations migrate to the new tools while preserving sending preferences.
 Existing managed 0.6.1 installations with daily updates enabled transition automatically:
 the old updater installs the new package, then the next scheduled run (or an earlier
 MCP start) adds the current tools to unchanged standard Codex/Gemini registrations.
@@ -230,7 +269,7 @@ native message ID can leave an `unknown` result that requires manual verificatio
 creating a new draft to retry could duplicate the original message.
 
 The local outbox contains message text, recipient metadata and unsent attachment
-snapshots. It stays private to the macOS user, outside source archives. Sent or
+snapshots. It stays private to the operating-system user, outside source archives. Sent or
 failed completed uploads release their snapshot; dispatch metadata is retained for
 deduplication. Never share installed profiles or the outbox.
 
@@ -262,13 +301,14 @@ MCP processes forward requests to one local background service. The service owns
 the TDLib session and processes a shared queue one request at a time. Ending a
 Codex or Gemini task does not interrupt other clients.
 
-Each person uses their own Telegram account on their own Mac. Share the repository
+Each person uses their own Telegram account on their own computer. Share the repository
 link or a clean source/release archive. Do not share installed copies with their
-data, Keychain entries, policy.json, TDLib database, or session.
+data, Keychain/Credential Manager entries, policy.json, TDLib database, or session.
 
 ## Documentation
 
 - [Quick start](START_HERE.md)
+- [ChatGPT Work on Windows](INSTALL_WINDOWS.md)
 - [Install with AI: Codex or Gemini CLI](INSTALL.md)
 - [Installation, updates, and troubleshooting](INSTALL_MACOS.md)
 - [Uninstallation and Telegram session revocation](UNINSTALL_MACOS.md)

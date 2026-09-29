@@ -19,7 +19,7 @@ MAX_REQUEST_BYTES = 32 * 1024
 MAX_MEDIA_BYTES = 12 * 1024 * 1024
 MAX_RESPONSE_BYTES = 18 * 1024 * 1024
 MAX_TIMEOUT = 120.0
-READ_OPERATIONS = frozenset({"search_messages", "get_message", "get_context", "get_media", "list_voice_messages"})
+READ_OPERATIONS = frozenset({"search_public_posts", "search_messages", "get_message", "get_context", "get_media", "list_voice_messages"})
 SPEECH_OPERATIONS = frozenset({"transcribe_voice"})
 MANAGEMENT_OPERATIONS = frozenset({"status", "stop", "check_ready"})
 OUTGOING_OPERATIONS = frozenset({"prepare_message", "send_message", "get_send_status"})
@@ -77,6 +77,7 @@ def validate_request(value: Any) -> dict[str, Any]:
         return value
     required = {
         "search_messages": {"query", "cursor", "limit"},
+        "search_public_posts": {"query", "cursor", "limit"},
         "get_message": {"chat_id", "message_id"},
         "get_context": {"chat_id", "message_id", "before", "after"},
         "get_media": {"chat_id", "message_id", "quality", "max_bytes"},
@@ -129,7 +130,7 @@ def validate_request(value: Any) -> dict[str, Any]:
     if operation == "list_voice_messages":
         _integer(params["before_message_id"], 0, 2**63 - 1, "before_message_id")
         _integer(params["limit"], 1, 20, "limit")
-    if operation == "search_messages":
+    if operation in {"search_messages", "search_public_posts"}:
         query, cursor = params["query"], params["cursor"]
         if not isinstance(query, str) or not 2 <= len(query) <= 200 or not query.strip():
             raise ServiceProtocolError("Invalid query")
@@ -177,6 +178,8 @@ def _encode_message(message: RawMessage) -> dict[str, Any]:
 
 
 def encode_result(operation: str, result: Any, *, include_details: bool = True) -> Any:
+    if operation == "search_public_posts":
+        return _public_posts_result(result)
     if operation in WORKFLOW_OPERATIONS:
         return _workflow_result(operation, result)
     if operation in SPEECH_OPERATIONS:
@@ -230,6 +233,8 @@ def _decode_message(value: Any) -> RawMessage:
 
 
 def decode_result(operation: str, value: Any) -> Any:
+    if operation == "search_public_posts":
+        return _public_posts_result(value)
     if operation in WORKFLOW_OPERATIONS:
         return _workflow_result(operation, value)
     if operation in SPEECH_OPERATIONS:
@@ -301,3 +306,18 @@ def _workflow_result(operation: str, value: Any) -> dict:
         return results[operation].model_validate(value).model_dump(mode="json")
     except ValidationError as exc:
         raise ServiceProtocolError("Invalid " + operation + " result") from exc
+
+
+def _public_posts_result(value: Any) -> dict:
+    from .models import PublicPostSearchResult
+    from pydantic import ValidationError
+    try:
+        result = PublicPostSearchResult.model_validate(value)
+        if result.count != len(result.items) or result.count > result.requested_limit:
+            raise ValueError("Inconsistent public post count")
+        if any(len(item.text.value) > 4000 or len(item.channel_title.value) > 256
+               or (item.username is not None and len(item.username.value) > 33) for item in result.items):
+            raise ValueError("Oversized public post")
+        return result.model_dump(mode="json")
+    except (ValueError, TypeError, ValidationError) as exc:
+        raise ServiceProtocolError("Invalid public post search result") from exc

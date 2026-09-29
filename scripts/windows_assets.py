@@ -1,4 +1,13 @@
-# Native Windows x64 setup. No administrator rights or WSL required.
+"""Reviewed Windows release assets, stored as Python for legacy updater compatibility.
+
+The release builder parses this literal without executing the module. Windows
+ZIPs contain these exact derived files; GitHub source snapshots intentionally do
+not, because the installed 0.6.1 macOS updater only accepts its original formats.
+@PACKAGE_VERSION@ is replaced with the checked pyproject.toml version.
+"""
+
+WINDOWS_ASSETS = {
+    'install-windows.ps1': r"""# Native Windows x64 setup. No administrator rights or WSL required.
 [CmdletBinding()]
 param(
     [switch]$PrepareOnly,
@@ -44,4 +53,36 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Telegram MCP setup failed (exit $LASTEXITCODE). Existing login and installed versions are preserved." }
 } finally {
     if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Recurse -Force }
+}
+""",
+    'plugins/telegram-mcp-work/.codex-plugin/plugin.json': r"""{
+  "name": "telegram-mcp-work",
+  "version": "@PACKAGE_VERSION@",
+  "description": "Local Telegram history, media and free public posts search for ChatGPT Work on Windows. Each user signs in to their own account.",
+  "author": {
+    "name": "prabchevski"
+  },
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Telegram MCP",
+    "shortDescription": "Search your Telegram chats from ChatGPT Work.",
+    "longDescription": "Local Windows Telegram integration. Search chats and public channel posts, read messages and download media. Public posts search can consume Telegram's free search quota and never authorizes a paid search. Sending is disabled until explicitly enabled locally. Requires the Windows installer and your own Telegram login.",
+    "developerName": "prabchevski",
+    "category": "Productivity",
+    "capabilities": [
+      "Read"
+    ],
+    "defaultPrompt": "Find messages in my Telegram chats."
+  }
+}
+""",
+    'plugins/telegram-mcp-work/.mcp.json': r"""{
+  "mcpServers": {
+    "telegram": {
+      "command": "powershell.exe",
+      "args": ["-NoLogo", "-NoProfile", "-Command", "[Console]::Error.WriteLine('Run install-windows.ps1 to configure this plugin.'); exit 1"]
+    }
+  }
+}
+""",
 }

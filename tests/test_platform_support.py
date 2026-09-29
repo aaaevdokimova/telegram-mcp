@@ -216,3 +216,34 @@ def test_windows_file_handle_without_context_manager_is_closed(monkeypatch, tmp_
     else:
         getattr(platform, check)(tmp_path.resolve())
     assert handle.closed
+
+
+def test_windows_open_uses_file_module_reparse_constant(monkeypatch, tmp_path):
+    """pywin32 311 exports OPEN_REPARSE_POINT in win32file, not win32con."""
+    con = SimpleNamespace(GENERIC_READ=0x80000000, GENERIC_WRITE=0x40000000, READ_CONTROL=0x20000,
+        FILE_SHARE_READ=1, FILE_SHARE_WRITE=2, FILE_SHARE_DELETE=4, CREATE_NEW=1, OPEN_ALWAYS=4,
+        OPEN_EXISTING=3, FILE_FLAG_BACKUP_SEMANTICS=0x02000000)
+    captured = []
+    handle = object()
+    def create_file(*args):
+        captured.append(args)
+        return handle
+    monkeypatch.setitem(sys.modules, "win32con", con)
+    monkeypatch.setitem(sys.modules, "win32file", SimpleNamespace(
+        FILE_FLAG_OPEN_REPARSE_POINT=0x00200000, CreateFile=create_file))
+    monkeypatch.setitem(sys.modules, "pywintypes", SimpleNamespace(error=Exception))
+    assert platform._windows_open(tmp_path.resolve(), writable=False, directory=True) is handle
+    assert captured[0][5] == 0x02200000
+
+
+def test_windows_replace_uses_file_module_write_through_constant(monkeypatch, tmp_path):
+    """pywin32 311 exports MOVEFILE_WRITE_THROUGH only from win32file."""
+    captured = []
+    monkeypatch.setattr(platform, "IS_WINDOWS", True)
+    monkeypatch.setattr(platform, "assert_private_path", lambda *args, **kwargs: None)
+    monkeypatch.setitem(sys.modules, "win32con", SimpleNamespace(MOVEFILE_REPLACE_EXISTING=1))
+    monkeypatch.setitem(sys.modules, "win32file", SimpleNamespace(
+        MOVEFILE_WRITE_THROUGH=8, MoveFileEx=lambda *args: captured.append(args)))
+    source, target = tmp_path.resolve() / "source", tmp_path.resolve() / "target"
+    platform.replace_private_file(source, target)
+    assert captured == [(str(source), str(target), 9)]

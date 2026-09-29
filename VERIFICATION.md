@@ -1,10 +1,17 @@
 # Verification
 
-## Version 0.9.0 — Windows portability
+## Version 0.9.0 — Windows and free public posts search
 
-Source baseline: remote main `9652983` (0.8.0). The unmodified baseline passed 308 tests on macOS. Changes add Windows ACL/locking/credential tests, mutually authenticated loopback transport tests, plugin registration preservation tests, and a Windows x64 CI job. The installer smoke check uses temporary program and marketplace directories, verifies the pinned native DLL, performs two immutable installations, and checks MCP discovery with 13/17/13 tools without authorizing Telegram or invoking a Telegram tool.
+Source baseline: remote main `9652983` (0.8.0). The unmodified baseline passed 308 tests on macOS. Changes add Windows ACL/locking/credential tests, mutually authenticated loopback transport tests, plugin registration preservation tests, and a Windows x64 CI job. The installer smoke check uses temporary program and marketplace directories, verifies the pinned native DLL, performs two immutable installations, and checks MCP discovery with 14/18/14 tools without authorizing Telegram or invoking a Telegram tool.
 
 Verification status is recorded in the change's CI results. A successful automated run does not establish that a real Windows ChatGPT Work UI has installed the plugin or that a user's Telegram account has authorized successfully. Those two acceptance steps remain with the Windows user. This work never changes a developer's real profile, Keychain/Credential Manager entries, or client settings.
+
+Public-post search uses the same backend, wire transport and MCP registration on
+all platforms. Tests cover hardcoded zero Stars, quota preflight and limit races,
+unsupported/legacy TDLib, native continuation and metadata trust. No live public
+search was performed during development: tests do not consume Telegram quota.
+A real Windows ChatGPT Work check must also verify service lifetime while two
+chats use the plugin and the chat that started the service is closed.
 
 ## Version 0.8.0 — September 16, 2026
 

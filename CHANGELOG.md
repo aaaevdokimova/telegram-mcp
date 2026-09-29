@@ -5,8 +5,11 @@
 - Add a native Windows x64 installer and local ChatGPT Work plugin. Immutable program versions and a validated JSON pointer avoid developer-mode symlink requirements.
 - Use Windows Credential Manager, per-user protected filesystem ACLs and native file locks. Each user authorizes their own account; no session or secrets ship with the source.
 - Retain one shared TDLib owner on Windows, using authenticated loopback transport, bounded requests and graceful draining. Unix socket behavior remains on macOS/Linux.
-- Discover and verify the pinned Windows TDLib DLL. Add native Windows CI and isolated installer/MCP-discovery checks; default 13 tools and optional 17 tools remain unchanged.
+- Discover and verify the pinned Windows TDLib DLL. Add native Windows CI and isolated installer/MCP-discovery checks; default discovery now has 14 tools, or 18 with sending.
 - Preserve other marketplace entries and user-edited/removed plugin registration during updates. Windows updates are manual; macOS updates retain their existing behavior.
+- Add `telegram_search_public_posts` on all platforms: public channel text search without joining, separate from account history, free-only with server-fixed `star_count=0` and structured quota outcomes.
+- Bind native public-search continuation to account/query, preserve empty-page continuation, suppress duplicates and reject loops. Mark text and channel metadata as untrusted and include only native-confirmed public links.
+- Migrate exact standard 0.8 registrations to include the public-search tool; preserve deleted/customized registrations and sending preferences.
 
 ## 0.8.0 — 2026-09-16
 

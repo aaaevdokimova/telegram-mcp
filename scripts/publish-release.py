@@ -35,7 +35,7 @@ def current_notes(source: Path, version: str) -> str:
         if expected not in (source / name).read_text():
             raise RuntimeError(f'{name} does not describe the current version')
     changes = sections[0].split('\n', 1)[1].strip()
-    return f'''Telegram MCP for ChatGPT Work on Windows x64 and Codex and Gemini CLI on macOS: chat navigation, unread history, search, local file downloads, Telegram-native voice/video-note transcription, and optional drafts, replies and scheduled text/document sending. Thirteen tools by default, seventeen with sending enabled.
+    return f'''Telegram MCP for ChatGPT Work on Windows x64 and Codex and Gemini CLI on macOS: chat navigation, unread history, chat search and free public channel posts search, local file downloads, Telegram-native voice/video-note transcription, and optional drafts, replies and scheduled text/document sending. Fourteen tools by default, eighteen with sending enabled. Public posts search can consume Telegram's free search quota; paid searches are never authorized.
 
 ## Changes in {version}
 
@@ -62,7 +62,7 @@ def prepare(source: Path, directory: Path) -> tuple[str, list[Path], Path]:
     notes = current_notes(source, version)
     archive = directory / f'telegram-mcp-macos-v{version}.zip'
     manifest = release.verify_archive(archive)
-    if manifest != release.manifest_for(release.inventory(source)):
+    if manifest != release.manifest_for(release.archive_payload(release.inventory(source))):
         raise RuntimeError('Archive does not match this checked commit')
     wheel = directory / f'telegram_search_mcp-{version}-py3-none-any.whl'
     release.verify_wheel(wheel, source)

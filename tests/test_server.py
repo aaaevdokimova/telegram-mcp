@@ -89,6 +89,7 @@ async def test_server_exposes_reads_and_explicit_speech_request() -> None:
 
     assert {tool.name for tool in result.tools} == {
         "telegram_search_messages",
+        "telegram_search_public_posts",
         "telegram_get_message",
         "telegram_get_context",
         "telegram_get_media", "telegram_list_voice_messages", "telegram_transcribe_voice",
@@ -103,7 +104,7 @@ async def test_server_exposes_reads_and_explicit_speech_request() -> None:
     }
     for tool in result.tools:
         assert tool.annotations is not None
-        assert tool.annotations.read_only_hint is (tool.name not in {"telegram_transcribe_voice", "telegram_download_file"})
+        assert tool.annotations.read_only_hint is (tool.name not in {"telegram_transcribe_voice", "telegram_download_file", "telegram_search_public_posts"})
         assert tool.annotations.destructive_hint is False
         assert tool.annotations.open_world_hint is True
 

@@ -9,6 +9,7 @@ accepted. No application state, native libraries or Python environments ship.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import os
@@ -21,16 +22,22 @@ import zipfile
 
 PACKAGE_ROOT = "telegram-mcp-macos"
 MANIFEST_NAME = "RELEASE_MANIFEST.json"
+WINDOWS_ASSETS_SOURCE = "scripts/windows_assets.py"
+DERIVED_FILES = frozenset({
+    "install-windows.ps1",
+    "plugins/telegram-mcp-work/.codex-plugin/plugin.json",
+    "plugins/telegram-mcp-work/.mcp.json",
+})
 IGNORED_DIRS = frozenset(
     {".git", ".venv", ".pytest_cache", "__pycache__", "dist", ".ruff_cache", ".mypy_cache"}
 )
 REQUIRED_FILES = frozenset(
     {"pyproject.toml", "uv.lock", "README.md", "LICENSE", "AGENTS.md", "INSTALL.md", "INSTALL_MACOS.md", "START_HERE.md",
      "UNINSTALL_MACOS.md", "install-macos.command", "uninstall-macos.command", "scripts/release.py",
-     "scripts/install.py", "src/telegram_search_mcp/__init__.py"}
+     "scripts/install.py", WINDOWS_ASSETS_SOURCE, "src/telegram_search_mcp/__init__.py"}
 )
 ROOT_FILES = REQUIRED_FILES | {
-    ".gitignore", "NOTICE", "update-macos.command", "uninstall-macos.command", "install-windows.ps1"
+    ".gitignore", "NOTICE", "update-macos.command", "uninstall-macos.command"
 }
 FORBIDDEN_PARTS = frozenset(
     {"profiles", "runtime", "database", "files", "secrets", "credentials", ".ssh",
@@ -54,7 +61,7 @@ def allowed_path(name: str) -> bool:
     path = PurePosixPath(name)
     if not path.parts or path.is_absolute() or ".." in path.parts or "\\" in name or name != path.as_posix():
         return False
-    if name in ROOT_FILES:
+    if name in ROOT_FILES or name in DERIVED_FILES:
         return True
     if len(path.parts) == 1 and path.suffix == ".md":
         return True
@@ -63,8 +70,6 @@ def allowed_path(name: str) -> bool:
     if path.parts[0] == "tests" and path.suffix == ".py":
         return path.name.startswith("test_") or path.name in {"conftest.py", "__init__.py"}
     if path.parts[0] == "scripts" and path.suffix in {".sh", ".py"}:
-        return True
-    if name in {"plugins/telegram-mcp-work/.codex-plugin/plugin.json", "plugins/telegram-mcp-work/.mcp.json"}:
         return True
     return path.parts[:2] == (".github", "workflows") and path.suffix in {".yml", ".yaml"}
 
@@ -91,7 +96,49 @@ def file_mode(name: str) -> int:
     return 0o755 if name.endswith((".command", ".sh")) else 0o644
 
 
+def windows_assets(payload: dict[str, bytes]) -> dict[str, bytes]:
+    """Materialize reviewed literals without executing code from a source bundle."""
+    try:
+        tree = ast.parse(payload[WINDOWS_ASSETS_SOURCE].decode("utf-8"))
+        nodes = tree.body
+        if nodes and isinstance(nodes[0], ast.Expr) and isinstance(nodes[0].value, ast.Constant) and isinstance(nodes[0].value.value, str):
+            nodes = nodes[1:]
+        if (len(nodes) != 1 or not isinstance(nodes[0], ast.Assign)
+                or len(nodes[0].targets) != 1 or not isinstance(nodes[0].targets[0], ast.Name)
+                or nodes[0].targets[0].id != "WINDOWS_ASSETS"):
+            raise ValueError("Expected a single literal Windows assets assignment")
+        assets = ast.literal_eval(nodes[0].value)
+        if not isinstance(assets, dict) or assets.keys() != DERIVED_FILES or not all(isinstance(value, str) for value in assets.values()):
+            raise ValueError("Unexpected derived Windows files")
+        version = tomllib.loads(payload["pyproject.toml"].decode())["project"]["version"]
+        if not isinstance(version, str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+            raise ValueError("Invalid Windows plugin version")
+    except (KeyError, TypeError, ValueError, SyntaxError) as error:
+        raise ReleaseError("Invalid reviewed Windows assets source") from error
+    generated = {name: content.replace("@PACKAGE_VERSION@", version).encode("utf-8") for name, content in assets.items()}
+    for name, content in generated.items():
+        check_file(name, content)
+    return generated
+
+
+def archive_payload(source_payload: dict[str, bytes]) -> dict[str, bytes]:
+    """A release ZIP includes derived Windows entry points, unlike Git source."""
+    if DERIVED_FILES & source_payload.keys():
+        raise ReleaseError("Expected source inventory without generated Windows assets")
+    return dict(sorted({**source_payload, **windows_assets(source_payload)}.items()))
+
+
+def source_payload(archive_files: dict[str, bytes]) -> dict[str, bytes]:
+    """Validate derived bytes before recovering the Git-compatible source set."""
+    source = {name: content for name, content in archive_files.items() if name not in DERIVED_FILES}
+    actual = {name: archive_files[name] for name in DERIVED_FILES if name in archive_files}
+    if actual != windows_assets(source):
+        raise ReleaseError("Generated Windows assets differ from their reviewed source")
+    return dict(sorted(source.items()))
+
+
 def inventory(source: Path) -> dict[str, bytes]:
+    """Audit raw source or a full extracted ZIP; return only Git source files."""
     source = source.resolve()
     payload: dict[str, bytes] = {}
     existing_manifest: bytes | None = None
@@ -124,9 +171,13 @@ def inventory(source: Path) -> dict[str, bytes]:
     init = payload["src/telegram_search_mcp/__init__.py"].decode()
     if not re.search(rf'__version__\s*=\s*[\"\']{re.escape(version)}[\"\']', init):
         raise ReleaseError("Package __version__ disagrees with pyproject.toml")
+    generated = {name: payload.pop(name) for name in DERIVED_FILES if name in payload}
+    expected_payload = archive_payload(payload)
+    if generated and generated != windows_assets(payload):
+        raise ReleaseError("Generated Windows assets differ from their reviewed source")
     if existing_manifest is not None:
         try:
-            matches = json.loads(existing_manifest) == manifest_for(payload)
+            matches = generated.keys() == DERIVED_FILES and json.loads(existing_manifest) == manifest_for(expected_payload)
         except ValueError as error:
             raise ReleaseError("Invalid manifest in extracted source bundle") from error
         if not matches:
@@ -191,6 +242,7 @@ def verify_archive(archive_path: Path) -> dict:
         raise ReleaseError("Archive lacks a valid release manifest") from error
     if REQUIRED_FILES - payload.keys():
         raise ReleaseError("Archive is missing required source files")
+    source_payload(payload)
     expected = manifest_for(payload)
     if manifest != expected:
         raise ReleaseError("Archive content does not match its release manifest")
@@ -198,7 +250,7 @@ def verify_archive(archive_path: Path) -> dict:
 
 
 def build(source: Path, output: Path) -> Path:
-    payload = inventory(source)
+    payload = archive_payload(inventory(source))
     manifest = manifest_bytes(payload)
     version = manifest_for(payload)["version"]
     output.mkdir(parents=True, exist_ok=True)

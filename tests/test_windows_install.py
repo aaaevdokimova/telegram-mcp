@@ -57,9 +57,10 @@ def test_launcher_does_not_interpolate_install_path_as_powershell_code():
 
 def test_plugin_template_is_fail_closed_until_configured():
     source = Path(__file__).resolve().parents[1]
-    template = source / 'plugins/telegram-mcp-work'
-    manifest = json.loads((template / '.codex-plugin/plugin.json').read_text())
-    config = json.loads((template / '.mcp.json').read_text())
+    release = installer._release_module(source)
+    assets = release.windows_assets(release.inventory(source))
+    manifest = json.loads(assets['plugins/telegram-mcp-work/.codex-plugin/plugin.json'])
+    config = json.loads(assets['plugins/telegram-mcp-work/.mcp.json'])
     assert manifest['name'] == installer.PLUGIN_NAME
     assert manifest['mcpServers'] == './.mcp.json'
     assert 'exit 1' in config['mcpServers']['telegram']['args'][-1]

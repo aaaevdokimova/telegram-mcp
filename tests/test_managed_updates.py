@@ -320,7 +320,7 @@ def test_06_activation_migrates_both_clients_once_preserving_login_and_sending(m
     for client, path in {"codex": codex, "gemini": gemini}.items():
         actual = registration._load(client, path, path.read_bytes())[registration.NAMES[client]][registration.ALIASES[client]]
         assert actual == wanted[client]
-        assert len(actual["enabled_tools" if client == "codex" else "includeTools"]) == (17 if sending else 13)
+        assert len(actual["enabled_tools" if client == "codex" else "includeTools"]) == (18 if sending else 14)
         assert list(path.parent.glob(path.name + ".telegram-search-backup-*"))
 
 
@@ -446,3 +446,38 @@ def test_07_activation_preserves_preferences_and_custom_registrations(managed, m
         for client, path in {'codex': codex, 'gemini': gemini}.items():
             actual = registration._load(client, path, path.read_bytes())[registration.NAMES[client]][registration.ALIASES[client]]
             assert actual == entries[client]
+
+
+@pytest.mark.parametrize("sending", [False, True])
+@pytest.mark.parametrize("change", [None, "removed", "tools", "approval"])
+def test_08_public_search_activation_preserves_owner_changes(managed, monkeypatch, sending, change):
+    root, version, codex = managed
+    from telegram_search_mcp.sending_settings import set_sending
+    if sending:
+        set_sending(root, True)
+    gemini = root / "gemini/settings.json"
+    updater.remember_clients(root, {"gemini": gemini})
+    wanted = {}
+    for client, path in {"codex": codex, "gemini": gemini}.items():
+        wanted[client] = registration.expected_entry(client, str(version / ".venv/bin/python"), root)
+        old = activation.navigation_entry(client, wanted[client])
+        key = "enabled_tools" if client == "codex" else "includeTools"
+        assert len(old[key]) == (17 if sending else 13)
+        if change == "removed":
+            old = None
+        elif change == "tools":
+            old[key].pop(0)
+        elif change == "approval":
+            old["trust" if client == "gemini" else "default_tools_approval_mode"] = True if client == "gemini" else "approve"
+        write_entry(client, path, old)
+    before = codex.read_bytes(), gemini.read_bytes()
+    monkeypatch.setattr(activation, "running_version", lambda: version)
+    result = activation.migrate(root)
+    if change is None:
+        assert result["status"] == "migrated"
+        for client, path in {"codex": codex, "gemini": gemini}.items():
+            actual = registration._load(client, path, path.read_bytes())[registration.NAMES[client]][registration.ALIASES[client]]
+            assert actual == wanted[client]
+    else:
+        assert result["status"] == "unchanged"
+        assert (codex.read_bytes(), gemini.read_bytes()) == before
