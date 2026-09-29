@@ -3,39 +3,46 @@
 ## Shared session
 
 ```text
-Codex, task 1 ── MCP stdio ─┐
-Codex, task 2 ── MCP stdio ─┼── local Unix socket ── queue ── TDLib ── Telegram
-Gemini CLI    ── MCP stdio ─┘                    one profile owner
+Client, chat 1 ── MCP stdio ─┐
+Client, chat 2 ── MCP stdio ─┼── private local connection ── queue ── TDLib ── Telegram
+Other client  ── MCP stdio ─┘                           one profile owner
 ```
 
 The MCP server is a small proxy. It starts a shared background service on the
 first request. Tool discovery is available before Telegram authorization.
-The service handles one profile belonging to the current macOS user; other users
+The service handles one profile belonging to the current operating-system user; other users
 and profiles are isolated. A separate lock prevents simultaneous service startups.
 The `tdlib.lock` file continues to protect the TDLib database.
 
 The service accepts a fixed set of requests: the original four read operations,
 voice listing, explicitly requested speech recognition, local diagnostics/shutdown,
-bounded navigation/download operations, and four optional outgoing/draft operations. Sending is disabled
+bounded navigation/download operations, free public posts search, and four optional outgoing/draft operations. Sending is disabled
 unless enabled locally. It does not accept arbitrary TDLib methods, Python function
 names, or commands to execute through the connection. Only outgoing preparation
 can accept a bounded local attachment path; downloads export into a fixed private profile directory.
 
 ## Local connection
 
-A Unix socket lives in a short, private directory belonging to the current user.
-No network port is opened. Directories use permissions 0700, and connection files
+On macOS/POSIX, a Unix socket lives in a short, private directory belonging to the current user.
+Directories use permissions 0700, and connection files
 are accessible to their owner. Ownership, symlinks, and the connecting process's
 credentials are checked. The protocol limits message size, parameters, and queue
 length. Requests and Telegram content are not logged.
 
-The trust boundary is the **macOS user account**. Other programs running as you
+Windows uses an exclusively bound ephemeral TCP port on `127.0.0.1`. A private
+endpoint file stores a fresh random secret. Role-separated HMAC challenge/response
+authenticates both sides; the client sends no proof or request until it verifies
+the server. Windows DACLs restrict runtime files to the user and LocalSystem,
+native locks enforce one owner, and reparse points and hard links are rejected.
+The endpoint is local only; no public server or tunnel is required.
+
+The trust boundary is the **operating-system user account**. Other programs running as you
 have the same local permissions. This does not isolate your data from malicious
 software already running under your account. The AI client receives the Telegram
 results returned by tools and handles them under its own policies.
 
-Client launchers clear the inherited environment and use an absolute Python path
-with `-I` isolation. TDLib 1.8.67 is loaded from the locked wheel on Apple Silicon
+Client launchers clear inherited injection variables and use an absolute Python path
+with `-I` isolation. TDLib 1.8.67 is loaded from the locked wheel on Apple Silicon and Windows x64
 or a pinned source build on Intel; its version and source commit are verified.
 Project environment variables cannot select another database through
 `TGSEARCH_DATA_DIR` or another library through `TDJSON_LIBRARY`.
@@ -69,9 +76,9 @@ requests and run `service stop` first.
 
 | Area | Current behavior |
 | --- | --- |
-| Data | `~/Library/Application Support/TelegramSearchMCPShared/profiles/default` |
-| Keychain service | `local.unofficial-telegram-search-mcp-shared` |
-| Credentials | `default:api_hash`, `default:database_key`; local Keychain only |
+| Data | macOS: `~/Library/Application Support/TelegramSearchMCPShared/profiles/default`; Windows: `%LOCALAPPDATA%/TelegramSearchMCPShared/profiles/default` |
+| Credential namespace | `local.unofficial-telegram-search-mcp-shared` |
+| Credentials | `default:api_hash`, `default:database_key`; macOS Keychain or Windows Credential Manager |
 | Previous Codex/Gemini data | Explicit installer upgrade can select one compatible profile in place |
 | Authorization | Your own api_id/api_hash, QR, and code/2FA in Terminal if required |
 | Media | Text and structured metadata for both clients |
@@ -90,8 +97,9 @@ creates a separate session only when no reusable saved session is selected.
 ## Program updates
 
 The managed installation has immutable version directories and stable launchers.
-Each launcher resolves `current` to an immutable path before executing Python, so
-switching the symlink cannot change a running process's import path. An existing
+Each launcher resolves the active version to an immutable path before executing Python.
+macOS uses a `current` symlink; Windows uses a validated `current.json` pointer and
+needs no symlink privilege. Activation cannot change a running process's import path. An existing
 proxy also resolves the newest installed interpreter when starting a shared service.
 New clients gracefully replace an idle older service; a busy service finishes its
 work before an upgrade is retried. No process is killed to release a profile.
@@ -101,11 +109,18 @@ canonical main SHA with a successful push workflow, downloads a pinned source ZI
 and validates paths, file types, size, and source allowlists. It stages locked
 dependencies and checks imports before activation. Installation locks prevent
 concurrent activation; client settings and the receipt are checked for changes
-during download. Activation migrates only exact known standard 0.6 and 0.7 tool lists to
+during download. Activation migrates only exact known standard 0.6, 0.7 and 0.8 tool lists to
 the new schema, with locked comparisons and private backups. Removed/customized
 registrations and sending preferences are preserved. A restart notice is saved
 locally and requested through macOS notifications. Disabling
 updates removes the schedule; disconnecting the last registered client also disables it.
+
+Windows updates are manual: rerun the new release's installer. The personal
+plugin uses an absolute stable launcher path, so desktop plugin caching does not
+bind it to the extracted ZIP. Receipt hashes preserve edited or removed plugin
+registrations. Windows entry points are generated from reviewed Python literals
+when building the ZIP; Git source snapshots remain acceptable to the historical
+macOS updater's unchanged source allowlist.
 
 An installation receipt records version, revision, client config paths, and update
 preference. It contains no Telegram credentials. Code updates trust the maintainer's
@@ -121,6 +136,22 @@ the application does not perform bulk history exports. TDLib caches media locall
 in the profile. Sending and transcription are explicit operations; transcription
 may consume Telegram's free quota. Authorization, the local database, cache, and
 installation settings also change as needed.
+
+## Free public posts search (0.9)
+
+`telegram_search_public_posts` is distinct from account-history and per-chat
+search. The serial owner checks `getPublicPostSearchLimits` and performs at most
+one `searchPublicPosts` with `star_count=0`. There is no payment argument or paid
+retry. It can consume a free quota slot, so the MCP tool is non-read-only and
+non-idempotent. Quota/access/unsupported outcomes never masquerade as empty success.
+
+Native offsets remain inside a bounded daemon-local cursor cache, bound to the
+account, exact normalized query and search kind. A cursor expires after ten minutes
+or a restart, and is consumed once on success. The cache holds at most 64 states,
+with at most 50 pages per chain; loops or exhausted bounds return explicit failure.
+Short and empty pages can retain a continuation. Public links come from TDLib;
+message IDs are never transformed into URLs. This operation does not join channels,
+mark messages read, download media or enable sending.
 
 ## Telegram-native transcription
 

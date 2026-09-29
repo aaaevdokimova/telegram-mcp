@@ -132,23 +132,24 @@ def main() -> None:
     args = parser.parse_args()
     if platform.system() != "Windows" or platform.machine().lower() not in {"amd64", "x86_64"}:
         parser.error("The actual installer smoke test requires native Windows x64")
-    powershell = shutil.which("pwsh.exe") or shutil.which("powershell.exe")
-    if powershell is None or shutil.which("uv") is None:
-        parser.error("PowerShell and uv must already be installed")
+    from telegram_search_mcp.windows_install import powershell_path
+    powershell = powershell_path()
+    if not powershell.is_file() or shutil.which("uv") is None:
+        parser.error("System Windows PowerShell 5.1 and uv must already be installed")
     spec = importlib.util.spec_from_file_location("release", Path(__file__).with_name("release.py"))
     assert spec is not None and spec.loader is not None
     release = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(release)
     manifest = release.verify_archive(args.archive)
 
-    # Spaces exercise native PowerShell argument handling and generated launchers.
+    # Exercise native PowerShell argument/JSON encoding for ordinary user paths.
     with tempfile.TemporaryDirectory(prefix="telegram windows install check ") as temporary:
         root = Path(temporary).resolve()
         with zipfile.ZipFile(args.archive) as archive:
-            archive.extractall(root / "unpacked source")
-        source = root / "unpacked source" / manifest["archive_root"]
-        install = root / "application with spaces"
-        marketplace_root = root / "disposable home"
+            archive.extractall(root / "исходники source")
+        source = root / "исходники source" / manifest["archive_root"]
+        install = root / "приложение with spaces"
+        marketplace_root = root / "пользователь home"
         marketplace = marketplace_root / ".agents" / "plugins" / "marketplace.json"
         marketplace.parent.mkdir(parents=True)
         original = {
@@ -166,7 +167,7 @@ def main() -> None:
         (preserved / "plugin.json").write_text(json.dumps({"name": "preserved-smoke-plugin"}), encoding="utf-8")
         marketplace.write_text(json.dumps(original), encoding="utf-8")
         command = [
-            powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-File",
+            str(powershell), "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
             str(source / "install-windows.ps1"), "-PrepareOnly",
             "-InstallDir", str(install), "-MarketplacePath", str(marketplace),
         ]

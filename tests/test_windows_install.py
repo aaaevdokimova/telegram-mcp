@@ -1,6 +1,8 @@
 """Registration edits must preserve other plugins and user customizations."""
 import json
 from pathlib import Path
+import subprocess
+import sys
 import pytest
 from telegram_search_mcp import windows_install as installer
 
@@ -49,7 +51,7 @@ def test_launcher_does_not_interpolate_install_path_as_powershell_code():
     text = installer.windows_launcher_text(dangerous, 'telegram_search_mcp.server')
     assert str(dangerous) not in text
     assert '$PSScriptRoot' in text
-    assert '-I -m telegram_search_mcp.server @args' in text
+    assert '-I -X utf8 -m telegram_search_mcp.server @args' in text
     assert 'ReparsePoint' in text
     with pytest.raises(ValueError):
         installer.windows_launcher_text(dangerous, 'bad;code')
@@ -64,3 +66,62 @@ def test_plugin_template_is_fail_closed_until_configured():
     assert manifest['name'] == installer.PLUGIN_NAME
     assert manifest['mcpServers'] == './.mcp.json'
     assert 'exit 1' in config['mcpServers']['telegram']['args'][-1]
+
+
+@pytest.mark.skipif(sys.platform != 'win32', reason='Actual Windows PowerShell pipe behavior')
+@pytest.mark.parametrize('hidden_console', [False, True])
+def test_native_launcher_preserves_unicode_json_stdio(tmp_path, hidden_console):
+    """A disposable fake MCP server exercises the real launcher without a profile."""
+    root = tmp_path / 'Телеграм install'
+    version = root / 'version-0.9.0-abcdef012345'
+    version.mkdir(parents=True)
+    (version / installer.VERSION_MARKER).write_bytes(b'telegram-search-mcp\n')
+    (root / 'current.json').write_text(json.dumps({'version': version.name}), encoding='utf-8')
+    environment = version / '.venv'
+    subprocess.run([sys.executable, '-I', '-m', 'venv', '--without-pip', str(environment)],
+                   check=True, capture_output=True, timeout=60)
+    package = environment / 'Lib/site-packages/telegram_search_mcp'
+    package.mkdir()
+    (package / '__init__.py').write_text('', encoding='utf-8')
+    (package / 'server.py').write_text('''import json
+import sys
+assert sys.flags.isolated and sys.flags.utf8_mode
+# MCP uses UTF-8 text wrappers around these binary pipes.
+sys.stdin.reconfigure(encoding='utf-8')
+sys.stdout.reconfigure(encoding='utf-8')
+for line in sys.stdin:
+    request = json.loads(line)
+    if 'id' not in request:
+        continue
+    if request['method'] == 'initialize':
+        result = {'protocolVersion': '2025-03-26', 'capabilities': {'tools': {}},
+                  'serverInfo': {'name': 'Тест 🌍', 'version': '1'}}
+    elif request['method'] == 'tools/call':
+        result = {'content': [{'type': 'text', 'text': request['params']['arguments']['text']}]}
+    else:
+        raise AssertionError(request)
+    print(json.dumps({'jsonrpc': '2.0', 'id': request['id'], 'result': result},
+                     ensure_ascii=False), flush=True)
+''', encoding='utf-8')
+    launcher = root / 'launch-mcp.ps1'
+    launcher.write_text(installer.windows_launcher_text(root, 'telegram_search_mcp.server'),
+                        encoding='utf-8', newline='\n')
+    unicode_text = 'Привет, мир — café 🌍 中文'
+    requests = [
+        {'jsonrpc': '2.0', 'id': 1, 'method': 'initialize', 'params': {}},
+        {'jsonrpc': '2.0', 'method': 'notifications/initialized'},
+        {'jsonrpc': '2.0', 'id': 2, 'method': 'tools/call',
+         'params': {'name': 'echo', 'arguments': {'text': unicode_text}}},
+    ]
+    wire = ''.join(json.dumps(request, ensure_ascii=False) + '\n' for request in requests).encode('utf-8')
+    result = subprocess.run(
+        [str(installer.powershell_path()), '-NoLogo', '-NoProfile', '-NonInteractive',
+         '-ExecutionPolicy', 'Bypass', '-File', str(launcher)],
+        input=wire, capture_output=True, timeout=30, check=True,
+        creationflags=subprocess.CREATE_NO_WINDOW if hidden_console else 0,
+    )
+    responses = [json.loads(line) for line in result.stdout.decode('utf-8').splitlines()]
+    assert len(responses) == 2, 'Launcher emitted extra stdout or lost a protocol response'
+    assert responses[0]['result']['serverInfo']['name'] == 'Тест 🌍'
+    assert responses[1]['result']['content'][0]['text'] == unicode_text
+    assert result.stderr == b''

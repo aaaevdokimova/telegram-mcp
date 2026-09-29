@@ -247,3 +247,73 @@ def test_windows_replace_uses_file_module_write_through_constant(monkeypatch, tm
     source, target = tmp_path.resolve() / "source", tmp_path.resolve() / "target"
     platform.replace_private_file(source, target)
     assert captured == [(str(source), str(target), 9)]
+
+
+@pytest.mark.parametrize("principal,flags,mask,directory,accepted", [
+    ("current", 0, 0x1F01FF, True, True),
+    ("S-1-5-18", 0, 0x1F01FF, True, True),
+    ("S-1-5-32-544", 0, 0x1F01FF, True, True),
+    ("S-1-1-0", 0, 0x120089, True, True),  # broad read-only config access
+    ("S-1-3-0", 0x0B, 0x1F01FF, True, True),  # CREATOR_OWNER OI/CI/IO template
+    ("S-1-3-0", 0x03, 0x1F01FF, True, False),  # effective unknown owner placeholder
+    ("S-1-3-0", 0x0B, 0x1F01FF, False, False),
+    ("S-1-1-0", 0x0B, 0x1F01FF, True, False),  # broad inherited child writes
+    ("S-1-5-32-545", 0, 0x000004, True, False),  # Users create-subdirectory access
+    ("S-1-1-0", 0, 0x000002, False, False),
+])
+def test_windows_config_acl_handles_creator_owner_template_only(monkeypatch, tmp_path,
+        principal, flags, mask, directory, accepted):
+    handle = SimpleNamespace(Close=lambda: None)
+    dacl = SimpleNamespace(GetAceCount=lambda: 1, GetAce=lambda index: ((0, flags), mask, principal))
+    descriptor = SimpleNamespace(GetSecurityDescriptorDacl=lambda: dacl)
+    monkeypatch.setattr(platform, "IS_WINDOWS", True)
+    monkeypatch.setattr(platform, "_windows_open", lambda *args, **kwargs: handle)
+    monkeypatch.setattr(platform, "_check_windows_handle", lambda *args, **kwargs: None)
+    monkeypatch.setattr(platform, "_user_sid", lambda: "current")
+    monkeypatch.setitem(sys.modules, "win32security", SimpleNamespace(
+        GetSecurityInfo=lambda *args: descriptor, SE_FILE_OBJECT=1, DACL_SECURITY_INFORMATION=4,
+        ACCESS_ALLOWED_ACE_TYPE=0, ACCESS_DENIED_ACE_TYPE=1, ConvertSidToStringSid=lambda sid: sid))
+    if accepted:
+        platform.assert_safe_path(tmp_path.resolve(), directory=directory)
+    else:
+        with pytest.raises(RuntimeError, match="writable by other users") as exc:
+            platform.assert_safe_path(tmp_path.resolve(), directory=directory)
+        assert f"SID={principal}" in str(exc.value)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Native Windows inherited CREATOR_OWNER config ACL")
+def test_windows_creator_owner_template_allows_config_but_not_private_runtime(private_area):
+    import win32security
+    from telegram_search_mcp.config_io import atomic_write
+    dacl = win32security.GetNamedSecurityInfo(str(private_area), win32security.SE_FILE_OBJECT,
+        win32security.DACL_SECURITY_INFORMATION).GetSecurityDescriptorDacl()
+    dacl.AddAccessAllowedAceEx(win32security.ACL_REVISION, 0x0B, 0x1F01FF,
+        win32security.ConvertStringSidToSid("S-1-3-0"))
+    win32security.SetNamedSecurityInfo(str(private_area), win32security.SE_FILE_OBJECT,
+        win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
+        None, None, dacl, None)
+    platform.assert_safe_path(private_area, directory=True)
+    with pytest.raises(RuntimeError, match="private"):
+        platform.assert_private_path(private_area, directory=True)
+    target = private_area / "marketplace.json"
+    assert atomic_write(target, b'{"synthetic": true}\n', expected=None) is None
+    platform.assert_private_path(target)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Native ordinary Windows temporary config ACL")
+def test_windows_ordinary_temporary_config_directory_is_safe(tmp_path):
+    from telegram_search_mcp.config_io import atomic_write, read_source
+    # Intentionally ordinary mkdir/write_text: a pre-existing marketplace inherits
+    # Windows defaults, unlike private runtime objects created by our native API.
+    directory = tmp_path.resolve() / "ordinary config" / ".agents" / "plugins"
+    directory.mkdir(parents=True)
+    target = directory / "marketplace.json"
+    original = b'{"synthetic": "preserved"}\n'
+    target.write_bytes(original)
+    platform.assert_safe_path(directory, directory=True)
+    platform.assert_safe_path(target)
+    assert read_source(target) == original
+    backup = atomic_write(target, b'{"synthetic": "updated"}\n', expected=original)
+    assert backup.read_bytes() == original
+    platform.assert_private_path(backup)
+    platform.assert_private_path(target)

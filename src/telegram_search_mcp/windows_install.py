@@ -53,6 +53,11 @@ def windows_launcher_text(root: Path, module: str) -> str:
     # user path into PowerShell code and no execution through a mutable symlink.
     return '''$ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+# Keep native pipes UTF-8 when Windows PowerShell captures their output.
+$utf8 = [System.Text.UTF8Encoding]::new($false)
+[Console]::InputEncoding = $utf8
+[Console]::OutputEncoding = $utf8
+$OutputEncoding = $utf8
 $root = $PSScriptRoot
 $pointer = Get-Content -LiteralPath (Join-Path $root 'current.json') -Raw | ConvertFrom-Json
 $name = [string]$pointer.version
@@ -63,8 +68,7 @@ if ((Get-Content -LiteralPath (Join-Path $version '.telegram-search-install') -R
 $python = Join-Path $version '.venv\\Scripts\\python.exe'
 # Remove workspace injection variables before starting native libraries.
 foreach ($key in @('PYTHONPATH','PYTHONHOME','TDJSON_LIBRARY','TGSEARCH_DATA_DIR')) { Remove-Item "Env:$key" -ErrorAction SilentlyContinue }
-$env:PYTHONUTF8 = '1'
-& $python -I -m ''' + module + ''' @args
+& $python -I -X utf8 -m ''' + module + ''' @args
 exit $LASTEXITCODE
 '''
 
@@ -193,10 +197,10 @@ def install(source: Path, root: Path, marketplace: Path, uv: Path) -> dict:
         subprocess.run([str(uv), "sync", "--frozen", "--no-dev", "--no-editable", "--no-config", "--managed-python",
                         "--python", "3.13", "--project", str(version)], check=True, env=environment)
         python = version / ".venv/Scripts/python.exe"
-        subprocess.run([str(python), "-I", "-c",
+        subprocess.run([str(python), "-I", "-X", "utf8", "-c",
                         "from telegram_search_mcp.native_runtime import bundled_candidates,verify; "
                         "verify(bundled_candidates()[0]); from telegram_search_mcp.server import create_server"], check=True)
-        subprocess.run([str(python), "-I", "-m", "telegram_search_mcp.cli", "--help"], check=True, stdout=subprocess.DEVNULL)
+        subprocess.run([str(python), "-I", "-X", "utf8", "-m", "telegram_search_mcp.cli", "--help"], check=True, stdout=subprocess.DEVNULL)
         writes = {
             root / "launch-mcp.ps1": windows_launcher_text(root, "telegram_search_mcp.server").encode(),
             root / "tgsearch.ps1": windows_launcher_text(root, "telegram_search_mcp.cli").encode(),
@@ -251,11 +255,11 @@ def main() -> None:
     result = install(args.source.resolve(), root, marketplace.absolute(), args.uv.resolve())
     print(json.dumps(result, indent=2))
     if not args.prepare_only:
-        ready = subprocess.run([result["python"], "-I", "-m", "telegram_search_mcp.cli", "doctor"],
+        ready = subprocess.run([result["python"], "-I", "-X", "utf8", "-m", "telegram_search_mcp.cli", "doctor"],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if ready.returncode != 0:
-            subprocess.run([result["python"], "-I", "-m", "telegram_search_mcp.cli", "auth"], check=True)
-        subprocess.run([result["python"], "-I", "-m", "telegram_search_mcp.cli", "doctor", "--connect"], check=True)
+            subprocess.run([result["python"], "-I", "-X", "utf8", "-m", "telegram_search_mcp.cli", "auth"], check=True)
+        subprocess.run([result["python"], "-I", "-X", "utf8", "-m", "telegram_search_mcp.cli", "doctor", "--connect"], check=True)
     print("Restart ChatGPT. In Work, open Plugins, choose Personal, and install Telegram MCP. Start a new chat.")
 
 

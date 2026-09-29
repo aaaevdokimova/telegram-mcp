@@ -16,6 +16,10 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+$utf8 = [System.Text.UTF8Encoding]::new($false)
+[Console]::InputEncoding = $utf8
+[Console]::OutputEncoding = $utf8
+$OutputEncoding = $utf8
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT -or -not [Environment]::Is64BitProcess) {
     throw 'Run this installer in 64-bit PowerShell on Windows x64.'
 }
@@ -45,7 +49,7 @@ try {
     # Bootstrap from the same hash-locked dependencies as the final install.
     # Project/user uv configuration must not redirect the interpreter or venv.
     Get-ChildItem Env: | Where-Object { $_.Name -like 'UV_*' -or $_.Name -in @('VIRTUAL_ENV','PYTHONPATH','PYTHONHOME') } | ForEach-Object { Remove-Item ('Env:' + $_.Name) }
-    $arguments = @('run', '--project', $PSScriptRoot, '--frozen', '--no-dev', '--no-editable', '--no-config', '--managed-python', '--python', '3.13', 'python', '-I', (Join-Path $PSScriptRoot 'scripts/install-windows.py'), '--source', $PSScriptRoot, '--uv', $uv)
+    $arguments = @('run', '--project', $PSScriptRoot, '--frozen', '--no-dev', '--no-editable', '--no-config', '--managed-python', '--python', '3.13', 'python', '-I', '-X', 'utf8', (Join-Path $PSScriptRoot 'scripts/install-windows.py'), '--source', $PSScriptRoot, '--uv', $uv)
     if ($PrepareOnly) { $arguments += '--prepare-only' }
     if ($InstallDir) { $arguments += @('--install-dir', $InstallDir) }
     if ($MarketplacePath) { $arguments += @('--marketplace-path', $MarketplacePath) }

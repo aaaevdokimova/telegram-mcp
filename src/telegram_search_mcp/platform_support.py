@@ -183,8 +183,17 @@ def assert_safe_path(path: Path, *, directory: bool = False) -> None:
             ace = dacl.GetAce(index)
             if len(ace) != 3 or ace[0][0] not in {win32security.ACCESS_ALLOWED_ACE_TYPE, win32security.ACCESS_DENIED_ACE_TYPE}:
                 raise RuntimeError("Config has an unsupported Windows ACL")
-            if ace[0][0] == win32security.ACCESS_ALLOWED_ACE_TYPE and ace[1] & write_access and win32security.ConvertSidToStringSid(ace[2]) not in allowed_writers:
-                raise RuntimeError("Config must not be writable by other users")
+            principal = win32security.ConvertSidToStringSid(ace[2])
+            # Standard Windows directories carry an inherit-only CREATOR_OWNER
+            # template. It grants nothing on this directory; Windows substitutes
+            # the creator SID when a child receives an effective copy. Keep other
+            # broad write templates forbidden because our new config descendants
+            # would inherit them. Runtime private ACL validation stays stricter.
+            if directory and principal == "S-1-3-0" and ace[0][1] & 0x08:  # INHERIT_ONLY_ACE
+                continue
+            if ace[0][0] == win32security.ACCESS_ALLOWED_ACE_TYPE and ace[1] & write_access and principal not in allowed_writers:
+                raise RuntimeError(f"Config must not be writable by other users: {path} "
+                                   f"(SID={principal}, mask=0x{ace[1]:x}, flags=0x{ace[0][1]:x})")
     finally:
         handle.Close()
 
