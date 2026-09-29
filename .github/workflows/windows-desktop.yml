@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: windows-desktop-${{ github.ref }}
+  group: windows-desktop-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:

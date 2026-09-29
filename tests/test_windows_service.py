@@ -141,18 +141,31 @@ async def test_loopback_idle_stops_and_restart_rotates_secret(tcp_paths):
 
 
 @pytest.mark.asyncio
-async def test_unauthenticated_control_or_oversized_bytes_never_dispatch(tcp_paths):
+async def test_unauthenticated_control_or_oversized_bytes_never_dispatch(tcp_paths, monkeypatch):
     async with running(tcp_paths) as (service, backend):
         endpoint = read_endpoint(tcp_paths.endpoint)
+        responses = []
+        original_respond = service._respond
+        async def record_response(*args):
+            responses.append(args)
+            await original_respond(*args)
+        monkeypatch.setattr(service, "_respond", record_response)
         for payload in (b'{"operation":"stop"}', b"x" * (MAX_REQUEST_BYTES + 1024)):
             reader, writer = await asyncio.open_connection(HOST, endpoint.port)
-            await reader.readexactly(len(MAGIC) + 32)
-            writer.write(payload + b"x" * 40)
-            await writer.drain()
-            assert await asyncio.wait_for(reader.read(128), 2) == b""
-            writer.close()
-            await writer.wait_closed()
-        assert not service.stopping.is_set() and not backend.calls
+            try:
+                await reader.readexactly(len(MAGIC) + 32)
+                writer.write(payload + b"x" * 40)
+                await writer.drain()
+                # Rejecting a bad handshake with unread attacker bytes can
+                # close TCP with RST instead of FIN/EOF, depending on the OS.
+                with contextlib.suppress(ConnectionResetError):
+                    assert await asyncio.wait_for(reader.read(128), 2) == b""
+            finally:
+                writer.close()
+                with contextlib.suppress(ConnectionResetError):
+                    await asyncio.wait_for(writer.wait_closed(), 2)
+        await eventually(lambda: not service.connections)
+        assert not service.stopping.is_set() and not backend.calls and not responses
 
 
 @pytest.mark.asyncio
