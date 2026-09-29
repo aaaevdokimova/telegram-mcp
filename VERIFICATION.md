@@ -4,7 +4,7 @@
 
 Source baseline: remote main `9652983` (0.8.0). The unmodified baseline passed 308 tests on macOS. Changes add Windows ACL/locking/credential tests, mutually authenticated loopback transport tests, plugin registration preservation tests, and a Windows x64 CI job. The installer smoke check uses temporary program and marketplace directories, verifies the pinned native DLL, performs two immutable installations, and checks MCP discovery with 14/18/14 tools without authorizing Telegram or invoking a Telegram tool.
 
-Local macOS result: 455 tests passed, with 8 native Windows tests skipped. Native
+Local macOS result: 457 tests passed, with 9 native Windows tests skipped. Native
 Windows CI also exercises inherited directory ACLs, Windows PowerShell 5.1,
 Cyrillic installation paths, and Unicode MCP traffic through both ordinary and
 hidden-console launchers. Actual macOS installation/update and the unmodified

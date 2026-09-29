@@ -160,7 +160,8 @@ def test_windows_acl_validation_fails_closed(monkeypatch):
     platform._check_windows_handle(1, directory=False, private=True)
     original = dict(state)
     for changed in ({"owner": "another"}, {"acl": None}, {"acl": ACL([((0, 0), 1, "S-1-1-0")])},
-                    {"attributes": 0x400}, {"links": 2}, {"acl": ACL([((5, 0), 1, "current")])}):
+                    {"attributes": 0x400}, {"links": 2}, {"acl": ACL([((5, 0), 1, "current")])},
+                    {"acl": ACL([((0, 0x13), 0x1F01FF, "S-1-3-4")])}):
         state.update(original)
         state.update(changed)
         with pytest.raises(RuntimeError):
@@ -254,6 +255,8 @@ def test_windows_replace_uses_file_module_write_through_constant(monkeypatch, tm
     ("S-1-5-18", 0, 0x1F01FF, True, True),
     ("S-1-5-32-544", 0, 0x1F01FF, True, True),
     ("S-1-1-0", 0, 0x120089, True, True),  # broad read-only config access
+    ("S-1-3-4", 0x13, 0x1F01FF, True, True),  # inherited OWNER RIGHTS: verified owner
+    ("S-1-3-4", 0, 0x1F01FF, False, True),
     ("S-1-3-0", 0x0B, 0x1F01FF, True, True),  # CREATOR_OWNER OI/CI/IO template
     ("S-1-3-0", 0x03, 0x1F01FF, True, False),  # effective unknown owner placeholder
     ("S-1-3-0", 0x0B, 0x1F01FF, False, False),
@@ -281,14 +284,15 @@ def test_windows_config_acl_handles_creator_owner_template_only(monkeypatch, tmp
         assert f"SID={principal}" in str(exc.value)
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="Native Windows inherited CREATOR_OWNER config ACL")
-def test_windows_creator_owner_template_allows_config_but_not_private_runtime(private_area):
+@pytest.mark.skipif(sys.platform != "win32", reason="Native Windows owner-relative config ACL")
+@pytest.mark.parametrize("principal,flags", [("S-1-3-0", 0x0B), ("S-1-3-4", 0x03)])
+def test_windows_creator_owner_template_allows_config_but_not_private_runtime(private_area, principal, flags):
     import win32security
     from telegram_search_mcp.config_io import atomic_write
     dacl = win32security.GetNamedSecurityInfo(str(private_area), win32security.SE_FILE_OBJECT,
         win32security.DACL_SECURITY_INFORMATION).GetSecurityDescriptorDacl()
-    dacl.AddAccessAllowedAceEx(win32security.ACL_REVISION, 0x0B, 0x1F01FF,
-        win32security.ConvertStringSidToSid("S-1-3-0"))
+    dacl.AddAccessAllowedAceEx(win32security.ACL_REVISION, flags, 0x1F01FF,
+        win32security.ConvertStringSidToSid(principal))
     win32security.SetNamedSecurityInfo(str(private_area), win32security.SE_FILE_OBJECT,
         win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
         None, None, dacl, None)

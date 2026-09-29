@@ -177,7 +177,10 @@ def assert_safe_path(path: Path, *, directory: bool = False) -> None:
         dacl = descriptor.GetSecurityDescriptorDacl()
         if dacl is None:
             raise RuntimeError("Config must have an explicit safe Windows ACL")
-        allowed_writers = {win32security.ConvertSidToStringSid(_user_sid()), "S-1-5-18", "S-1-5-32-544"}
+        # OWNER RIGHTS identifies the object's current owner, whose SID was
+        # verified above. It is not a grant to arbitrary other users. Windows
+        # temporary/configuration directories can inherit this effective ACE.
+        allowed_writers = {win32security.ConvertSidToStringSid(_user_sid()), "S-1-5-18", "S-1-5-32-544", "S-1-3-4"}
         write_access = 0x40000000 | 0x10000000 | 0x000D0156
         for index in range(dacl.GetAceCount()):
             ace = dacl.GetAce(index)
