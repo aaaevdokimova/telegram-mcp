@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.9.1 — 2026-09-29
+
+- Publish the Windows x64 installer for both Codex desktop and ChatGPT Work, alongside the macOS installer for Codex and Gemini CLI. This is the first published release of the Windows and public-search changes developed in 0.9.0.
+- Make the repository URL the installation entry point: client/platform selection, verified release downloads, local Telegram login, registration, diagnostics, updates and removal are linked from README and the agent installation guide.
+- Add read-only `telegram_get_public_search_quota` to inspect the account's live limits without consuming a public-search attempt. Discovery now has 15 tools by default, or 19 with sending.
+- Require the agent to search account history/subscriptions first, explain the public scope and current free allowance, ask for explicit permission and wait before every new public query. Include this workflow in portable MCP instructions, tool descriptions and installation guides; never assume a fixed daily allowance or offer Stars payment.
+- Gate the initial public search with a five-minute single-use confirmation token bound to the account, query and quota snapshot, plus `user_confirmed=true`. Changed quota requires a fresh check and consent; the flag is the agent's report of human consent. Free native continuation remains within the approved query.
+- Migrate exact standard 0.8/0.9.0 registrations to both public-search tools while preserving removed/customized registrations and sending preferences.
+- Advance the shared-service version so idle older daemons can be replaced before the new quota operation is used.
+
+## 0.9.0 — 2026-09-29
+
+- Add a native Windows x64 installer and local ChatGPT Work plugin. Immutable program versions and a validated JSON pointer avoid developer-mode symlink requirements.
+- Use Windows Credential Manager, per-user protected filesystem ACLs and native file locks. Each user authorizes their own account; no session or secrets ship with the source.
+- Retain one shared TDLib owner on Windows, using authenticated loopback transport, bounded requests and graceful draining. Unix socket behavior remains on macOS/Linux.
+- Discover and verify the pinned Windows TDLib DLL. Add native Windows CI and isolated installer/MCP-discovery checks; default discovery now has 14 tools, or 18 with sending.
+- Preserve other marketplace entries and user-edited/removed plugin registration during updates. Windows updates are manual; macOS updates retain their existing behavior.
+- Add `telegram_search_public_posts` on all platforms: public channel text search without joining, separate from account history, free-only with server-fixed `star_count=0` and structured quota outcomes.
+- Bind native public-search continuation to account/query, preserve empty-page continuation, suppress duplicates and reject loops. Mark text and channel metadata as untrusted and include only native-confirmed public links.
+- Migrate exact standard 0.8 registrations to include the public-search tool; preserve deleted/customized registrations and sending preferences.
+
 ## 0.8.0 — 2026-09-16
 
 - Add chat discovery, unread chat/history views, date ranges and per-chat sender/media/topic search.

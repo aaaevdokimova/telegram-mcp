@@ -2,7 +2,6 @@
 from __future__ import annotations
 import hashlib
 import json
-import os
 from pathlib import Path
 import time
 from typing import Literal
@@ -12,6 +11,7 @@ from .models import OutputModel, TrustBoundary, UntrustedText
 from .navigation import Request, ChatId, Id, TopicId, cloud_chat, text, topic
 from .outgoing import valid_id, validate_content
 from .paths import ensure_private_dir
+from .platform_support import fsync_directory
 from .policy import _assert_private_file, _atomic_private_json
 from .tdjson import TdlibError
 
@@ -92,7 +92,7 @@ def set_draft(session, request: SetDraftRequest, directory: Path) -> dict:
         _assert_private_file(path)
         if path.stat().st_size > 65536:
             raise ValueError('Invalid draft operation record')
-        previous = json.loads(path.read_text())
+        previous = json.loads(path.read_text(encoding="utf-8"))
         if previous['user_id'] != session.user_id or previous['spec'] != spec:
             raise ValueError('operation_id belongs to different content or account')
         return previous['result']
@@ -108,11 +108,7 @@ def set_draft(session, request: SetDraftRequest, directory: Path) -> dict:
              'result': result(request, draft, status='unknown', operation_id=request.operation_id)}
     def save():
         _atomic_private_json(path, value)
-        fd = os.open(directory, os.O_RDONLY)
-        try:
-            os.fsync(fd)
-        finally:
-            os.close(fd)
+        fsync_directory(directory)
     save()
     try:
         response = session.request({'@type': 'setChatDraftMessage', 'chat_id': request.chat_id,

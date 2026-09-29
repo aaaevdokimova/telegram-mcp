@@ -1,35 +1,49 @@
-# Telegram MCP · 0.8.0
+# Telegram MCP · 0.9.1
 
-Browse and search Telegram chats, download files, transcribe voice messages, and optionally
-save drafts, reply, or schedule text and files with
-**Codex and Gemini CLI on macOS**.
-One installation and one Telegram login serve both clients at the same time.
-This is an unofficial project. Gemini's web and mobile apps are not supported.
+Подключите **свой Telegram** к **Codex или Gemini CLI на macOS**, **Codex на Windows x64** либо **ChatGPT Work с локальными плагинами на Windows x64**. Можно искать и читать сообщения, скачивать вложения, расшифровывать голосовые, а при отдельном включении — готовить и отправлять сообщения. Один локальный сервис обслуживает несколько чатов и клиентов с одним входом в Telegram.
 
-## Install with Codex or Gemini CLI
+## Дайте эту ссылку своему AI-агенту
 
-Send this to Codex or Gemini CLI on your Mac:
+Скопируйте в Codex или Gemini CLI на нужном компьютере:
 
-> Install https://github.com/prabchevski/telegram-mcp for the client I am using. Follow
-> INSTALL.md, upgrade my older installation if present, preserve my
-> Telegram login, and enable daily updates from main after successful checks.
+> Установи https://github.com/prabchevski/telegram-mcp для того клиента, которым я сейчас пользуюсь. Прочитай AGENTS.md и INSTALL.md, определи мою ОС, скачай подходящий архив последнего релиза и проверь SHA-256. Если установка уже есть — обнови её, сохрани вход в Telegram и остальные настройки. Выполни доступные проверки; первый вход я пройду в локальном окне, без передачи секретов в чат.
 
-**For the installing agent:** read [AGENTS.md](AGENTS.md) and
-[INSTALL.md](INSTALL.md) before changing the installation.
-Either assistant can prepare dependencies, migrate a compatible saved login, configure the
-client, and check the installation. First-time Telegram authorization, passwords,
-and any required macOS approval remain with the owner in their private Terminal.
-A client restart may be needed.
+Агент выберет инструкции для вашей ОС и клиента. Запрос «установи» уже разрешает обычную установку, зависимости и настройку выбранного клиента. Для первого подключения нужны ваши `api_id` и `api_hash` с [my.telegram.org](https://my.telegram.org): вводите их, код входа и пароль 2FA **только в локальном окне авторизации**. Существующий совместимый вход сохраняется. Перезапуск клиента или включение плагина может потребовать вашего действия.
 
-Prefer a manual installation? **[Download for macOS](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-macos.zip)**,
-extract the ZIP, and open `install-macos.command`. No manual build is needed.
-See the [quick start](START_HERE.md).
+**Для устанавливающего агента: начните с [AGENTS.md](AGENTS.md) → [INSTALL.md](INSTALL.md).** Не устанавливайте рабочую копию при простом просмотре или разработке проекта.
+
+## Выберите свою систему
+
+| Система и клиент | Способ подключения | Инструкция |
+| --- | --- | --- |
+| macOS Apple Silicon / Intel · Codex app или CLI | Локальный MCP, настройка Codex | [Установка на macOS](INSTALL_MACOS.md) |
+| macOS Apple Silicon / Intel · Gemini CLI | Локальный MCP, настройка Gemini CLI; Codex не требуется | [Установка на macOS](INSTALL_MACOS.md) |
+| Windows x64 · Codex desktop / CLI с поддержкой плагинов | Личный каталог плагинов → Telegram MCP | [Установка на Windows](INSTALL_WINDOWS.md) |
+| Windows x64 · ChatGPT Work с локальными плагинами | Личный каталог плагинов → Telegram MCP | [Установка на Windows](INSTALL_WINDOWS.md) |
+
+Gemini в браузере/на телефоне и обычный веб-чат ChatGPT не запускают этот локальный MCP. Пакета для нативного Windows ARM64 нет. На Windows не требуются WSL, публичный сервер или туннель. Нужен установленный клиент с поддержкой указанного способа подключения.
+
+Для ручной установки: **[macOS ZIP](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-macos.zip)** ([SHA-256](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-macos.zip.sha256)) · **[Windows ZIP](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-windows.zip)** ([SHA-256](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-windows.zip.sha256)). [Краткие шаги установки](START_HERE.md). Эти ссылки ведут на последний опубликованный релиз; архивы в разделе **Assets** содержат готовые установщики. Стандартные ссылки GitHub **Source code** не заменяют Windows-пакет.
+
+На macOS установка по умолчанию включает ежедневные обновления из `main` после успешных проверок. На Windows обновление выполняется повторным запуском нового установщика. Каждый пользователь входит в собственный аккаунт; репозиторий и релизы не содержат чужих сессий или ключей. Найденные сообщения передаются выбранному AI-клиенту. Это неофициальный проект.
+
+## Как пользоваться
+
+- «Найди в моём Telegram сообщения про встречу в пятницу».
+- «Покажи непрочитанные чаты» или «Что обсуждали вчера в этой группе?».
+- «Сохрани присланную таблицу» или «Расшифруй это голосовое».
+
+Сначала агент ищет по доступной истории аккаунта и подпискам. Для отдельного поиска публичных публикаций он проверяет реальный остаток бесплатных попыток, объясняет расход и **ждёт вашего согласия**. Оплата Stars отключена. По умолчанию доступны 15 инструментов; отправка выключена и добавляет ещё 4 только после включения. Подробнее — [публичный поиск](#free-public-channel-post-search) и [отправка](#optional-text-and-file-sending).
+
+Автопроверки покрывают ядро на macOS, Windows и Linux, установщики и MCP-соединение. Реальный вход в Telegram и работу интерфейса выбранного клиента проверяют на компьютере пользователя. Intel macOS использует сборку закреплённой версии TDLib; автоматическая проверка установки на Mac выполняется на Apple Silicon. Точные границы проверки описаны в [VERIFICATION.md](VERIFICATION.md).
 
 ## Features
 
 | Tool | Result |
 | --- | --- |
-| `telegram_search_messages` | Search accessible cloud chats, with up to 20 results and a cursor for the next page |
+| `telegram_search_messages` | Search the linked account's accessible cloud-chat history, up to 20 results per page |
+| `telegram_get_public_search_quota` | Check this account's free public-search quota for a query without running a search |
+| `telegram_search_public_posts` | Search public channel posts after a quota check and explicit user confirmation; free requests only |
 | `telegram_get_message` | Retrieve one message by chat and message IDs |
 | `telegram_get_context` | Retrieve up to five supported text or voice/video-note messages on either side of an anchor |
 | `telegram_get_media` | Retrieve a photo, supported audio, PDF, or video thumbnail; previews up to 2 MiB, full media up to 12 MiB |
@@ -78,6 +92,72 @@ media are rejected. The original inline preview/full-media tools retain their
 2 MiB/12 MiB limits. Downloads are explicit local writes, so their MCP annotation
 is not read-only.
 
+## Free public channel post search
+
+Public channel search extends beyond subscriptions and can use a limited free
+attempt. Start with the account's accessible history/subscriptions using
+`telegram_search_messages`, or one known chat using
+`telegram_search_chat_messages`. Show those results, then offer the broader public
+search if it would help. A general research request or poor results do not authorize
+this expansion automatically.
+
+Before each new public query, the agent must:
+
+1. Call `telegram_get_public_search_quota(query)`. This only checks Telegram's
+   current account limits; it does not run a search or consume a search attempt.
+2. Tell the user the query and broader scope, the remaining free attempts and any
+   wait, and whether this query would use an attempt or is already free/cached.
+   Ask for explicit permission and **wait for the answer**. Never assume a fixed
+   daily allowance; use the live account response.
+3. After permission, pass the quota response's `confirmation_token` and
+   `user_confirmed=true` to `telegram_search_public_posts(query, limit=20, ...)`.
+   If the token expires or the quota snapshot changes, check and ask again.
+
+For example, after searching subscriptions: «В ваших чатах я нашёл эти результаты.
+Могу также поискать публичные публикации по запросу “искусственный интеллект”,
+включая каналы, на которые вы не подписаны. По данным Telegram осталось N
+бесплатных попыток; этот запрос использует одну. Выполнить?» Replace the quota
+statement with the actual result, including when the query is already free or a
+wait is required. Do not offer a paid alternative.
+
+The confirmation token is single-use, expires after five minutes and is bound to
+the account, query and quota snapshot. Missing confirmation never starts a public
+search. The server checks the supplied token and confirmation flag; the agent is
+responsible for truthfully reporting the user's conversational approval. The
+server cannot independently prove that the human answered. MCP initialization
+instructions and tool descriptions carry the workflow to every client, including
+clients that do not read this repository's `AGENTS.md`.
+
+Each call makes at most one `searchPublicPosts` request, always with `star_count=0`.
+There is no payment argument, Stars purchase, paid retry or hidden extra page
+request. Never reformulate or launch a new public query without fresh permission.
+The search tool is non-read-only and non-idempotent because it may consume a free
+attempt; the quota-check tool is read-only. Sending need not be enabled.
+
+Quota fields include `remaining_free_query_count`, `next_free_query_in`,
+`is_current_query_free` and `star_count` (informational price only). A limit race,
+missing confirmation, unsupported TDLib or failed request has an explicit outcome,
+separate from a successful zero-match result. In particular, `confirmation_required`
+means approval is absent or invalid, and `quota_changed` requires a new quota check
+and confirmation. Telegram's account/access rules
+still apply. Public search covers Telegram's public channel index, not every
+Telegram message.
+
+Results contain bounded untrusted text/channel metadata and a public link only
+when confirmed by Telegram. No joining, read-state changes, attachment downloads
+or sending occur. Use `next_cursor` exactly with the same approved query; these
+free continuation pages need no new confirmation. Short or empty pages can still
+have a continuation. Cursors are bound to the account and search kind, expire
+after ten minutes or a service restart, and can be successfully consumed once.
+Do not interpret a limit, partial result or failed request as proof that a post
+does not exist.
+
+The implementation is shared across platforms; CI covers macOS, Windows and Linux
+core behavior. Packaged desktop installation is provided for macOS and Windows.
+
+Official contracts: [searchPublicPosts](https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1search_public_posts.html),
+[publicPostSearchLimits](https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1public_post_search_limits.html).
+
 ## Voice messages and Telegram transcription
 
 | Tool | Result |
@@ -103,8 +183,8 @@ accepted it, the result can remain pending and needs manual checking in Telegram
 Protected, self-destructing, and secret-chat messages are excluded. Text is bounded
 to 32,000 characters, with an explicit truncation flag, and is untrusted content.
 
-The default tool set contains 13 tools; enabling sending makes 17.
-Unchanged standard 0.7 registrations migrate to the new tools while preserving sending preferences.
+The default tool set contains 15 tools; enabling sending makes 19.
+Unchanged standard 0.7/0.8/0.9.0 registrations migrate to the new tools while preserving sending preferences.
 Existing managed 0.6.1 installations with daily updates enabled transition automatically:
 the old updater installs the new package, then the next scheduled run (or an earlier
 MCP start) adds the current tools to unchanged standard Codex/Gemini registrations.
@@ -224,7 +304,7 @@ native message ID can leave an `unknown` result that requires manual verificatio
 creating a new draft to retry could duplicate the original message.
 
 The local outbox contains message text, recipient metadata and unsent attachment
-snapshots. It stays private to the macOS user, outside source archives. Sent or
+snapshots. It stays private to the operating-system user, outside source archives. Sent or
 failed completed uploads release their snapshot; dispatch metadata is retained for
 deduplication. Never share installed profiles or the outbox.
 
@@ -236,8 +316,8 @@ two old clients use different accounts, the owner chooses one. A busy old profil
 must be released by its client before migration. Old archives require one upgrade
 through the installer/Codex to gain automatic updates.
 
-New interactive installs enable **daily updates from main after successful GitHub
-checks**. The Mac checks GitHub locally; a commit does not remotely deploy onto
+New macOS interactive installs enable **daily updates from main after successful GitHub
+checks**. Windows updates use the latest release installer as described in [INSTALL_WINDOWS.md](INSTALL_WINDOWS.md). The Mac checks GitHub locally; a commit does not remotely deploy onto
 other computers. Updates keep immutable program versions and preserve the login.
 New MCP processes use the new code; the shared service switches on its next start,
 after active work ends and the service becomes idle. An offline or sleeping Mac
@@ -256,14 +336,15 @@ MCP processes forward requests to one local background service. The service owns
 the TDLib session and processes a shared queue one request at a time. Ending a
 Codex or Gemini task does not interrupt other clients.
 
-Each person uses their own Telegram account on their own Mac. Share the repository
+Each person uses their own Telegram account on their own computer. Share the repository
 link or a clean source/release archive. Do not share installed copies with their
-data, Keychain entries, policy.json, TDLib database, or session.
+data, Keychain/Credential Manager entries, policy.json, TDLib database, or session.
 
 ## Documentation
 
 - [Quick start](START_HERE.md)
-- [Install with AI: Codex or Gemini CLI](INSTALL.md)
+- [Codex and ChatGPT Work on Windows](INSTALL_WINDOWS.md)
+- [Install with an AI agent: platform and client routing](INSTALL.md)
 - [Installation, updates, and troubleshooting](INSTALL_MACOS.md)
 - [Uninstallation and Telegram session revocation](UNINSTALL_MACOS.md)
 - [Architecture and limitations](ARCHITECTURE.md)
@@ -285,7 +366,7 @@ uv run --frozen python -I scripts/release.py build --output dist
 ```
 
 Tests use isolated profiles and settings and do not require a Telegram account.
-CI tests Linux/macOS and builds and installs an allowlisted source archive on a
+CI tests Linux/macOS and native Windows x64, and builds and installs an allowlisted source archive on a
 GitHub-hosted Mac. This is a test environment, not the maintainer's or users' Macs.
 After these checks pass on main, CI publishes each new package version to
 [GitHub Releases](https://github.com/prabchevski/telegram-mcp/releases/latest), with
@@ -305,4 +386,4 @@ Third-party dependencies retain their own licenses.
 - [Telegram: API credentials](https://core.telegram.org/api/obtaining_api_id)
 - [TDLib: pinned source](https://github.com/tdlib/td/tree/d1085f9cebc5a62379991ae1652673954f229c1f)
 
-Integration settings and native voice transcription were checked on September 16, 2026.
+Release checks and platform-specific acceptance limits are recorded in [VERIFICATION.md](VERIFICATION.md).

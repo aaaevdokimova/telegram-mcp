@@ -1,75 +1,87 @@
-# Telegram in Codex and Gemini CLI: quick start
+# Быстрый старт: Telegram в вашем AI-клиенте
 
-This archive connects **your own Telegram account** to Codex, Gemini CLI, or both
-clients on one Mac. Gemini integration requires **Gemini CLI**; the Gemini website
-and mobile app are not supported.
+Самый простой способ — отправить Codex или Gemini CLI на своём компьютере:
 
-## Before you start
+> Установи https://github.com/prabchevski/telegram-mcp для моего текущего клиента.
+> Следуй AGENTS.md и INSTALL.md, выбери пакет для моей ОС, проверь SHA-256 и
+> сохрани существующий вход в Telegram. Новый вход я пройду в локальном окне.
 
-Prefer AI-assisted setup? Give Codex or Gemini CLI the repository link and ask it to follow
-[INSTALL.md](INSTALL.md). It can also upgrade an older archive.
+Агент выполняет подготовку и проверку. От вас нужен установленный AI-клиент и,
+при первом подключении, вход в **собственный** аккаунт Telegram. `api_id` и
+`api_hash` можно получить в **API development tools** на
+[my.telegram.org](https://my.telegram.org). Не отправляйте API hash, QR, код входа
+или пароль 2FA в AI-чат.
 
-1. Install the client you want to use: Codex or Gemini CLI.
-2. Install [Homebrew](https://brew.sh/) if you do not already have it.
-3. Get your own `api_id` and `api_hash` under **API development tools** at
-   [my.telegram.org](https://my.telegram.org). See
-   [Telegram's official instructions](https://core.telegram.org/api/obtaining_api_id).
+## macOS: Codex или Gemini CLI
 
-Internet access is required. The installer adds uv, TDLib, and a suitable Python
-version if they are missing. Check that Codex/Gemini CLI is installed and available
-separately. The archive contains no other person's account, history, or keys.
+Поддерживаются Apple Silicon и Intel. Нужны интернет, выбранный клиент и
+[Homebrew](https://brew.sh/). Установщик добавляет uv, Python и закреплённую TDLib;
+на Intel первая сборка TDLib может занять несколько минут. Gemini нужен именно
+**CLI**, а не приложение в браузере или на телефоне.
 
-## Install
+1. Откройте [последний релиз](https://github.com/prabchevski/telegram-mcp/releases/latest).
+   В **Assets** скачайте `telegram-mcp-macos.zip` и `telegram-mcp-macos.zip.sha256`
+   из одного выпуска.
+2. В Terminal перейдите в папку с файлами и выполните:
 
-1. [Download the latest verified ZIP](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-macos.zip)
-   and extract it. Open the `telegram-mcp-macos` folder.
-2. Open `install-macos.command`. Choose **Codex**, **Gemini CLI**, or **both**.
-3. On the first installation, enter your `api_id` and hidden `api_hash` in Terminal.
-4. Scan the QR code from Telegram on your phone: **Settings → Devices → Link
-   Desktop Device**. If prompted, enter your login code and 2FA password in Terminal.
-5. Wait for the connection check to succeed, then restart the selected clients.
+   ```sh
+   shasum -a 256 -c telegram-mcp-macos.zip.sha256
+   ```
 
-A compatible saved login from an older archive is reused, so steps 3–4 may be
-skipped. Finish old Telegram requests before upgrading. If two old profiles use
-different accounts, choose one as described in [the migration guide](INSTALL_MACOS.md#upgrade-old-archives-and-preserve-a-login).
+   Продолжайте только после `OK`.
+3. Распакуйте ZIP и откройте `install-macos.command`. Выберите **Codex**,
+   **Gemini CLI** или **оба**.
+4. В локальном Terminal введите API credentials и подтвердите QR-вход:
+   Telegram на телефоне → **Настройки → Устройства → Подключить устройство**.
+   При необходимости введите код или пароль 2FA там же.
+5. Дождитесь проверки подключения и перезапустите выбранный клиент.
 
-Daily updates from main after successful GitHub checks are enabled by default.
-The installer prints the program root; use that path if it differs from the one
-below. Old Codex installations may use `~/Applications/TelegramSearchMCPShared`
-for the new program. Turn daily updates off with `current/tgsearch updates off`.
+Если macOS не открывает файл двойным щелчком: введите в Terminal `bash ` с пробелом,
+перетащите `install-macos.command` в окно и нажмите Enter.
 
-If macOS will not open the installer with a double-click, open Terminal, type `bash `
-with a trailing space, drag `install-macos.command` into the window, and press Enter.
+Сохранённый совместимый вход используется повторно. Ежедневные обновления из
+`main` после успешного CI включаются по умолчанию; их можно отключить командой
+`current/tgsearch updates off` из напечатанного корня программы.
+[Подробная инструкция, обновление старых версий и удаление](INSTALL_MACOS.md).
 
-**Do not paste your api_hash, login code, or 2FA password into an AI chat.** Search
-results expose the retrieved messages from your account to the selected AI client.
+## Windows x64: Codex desktop или ChatGPT Work
 
-## Check the installation
+Нужны интернет и клиент с поддержкой локальных плагинов. Права администратора и
+WSL не требуются. Нативный Windows ARM64 этим пакетом не поддерживается.
 
-Ask your client: "Find messages in my Telegram containing …" and use a phrase you
-recognize. Six tools are available by default: search, message, context, media,
-voice-message listing, and Telegram-native transcription. You can also ask it to
-transcribe a specific voice message; Telegram's account and quota limits apply.
+1. В [последнем релизе](https://github.com/prabchevski/telegram-mcp/releases/latest)
+   скачайте `telegram-mcp-windows.zip` и его `.sha256` из одного выпуска.
+   Проверьте сумму по [Windows-инструкции](INSTALL_WINDOWS.md) и распакуйте ZIP.
+2. Запустите `install-windows.ps1` в 64-битном PowerShell по той же инструкции.
+3. Пройдите авторизацию Telegram в локальном окне PowerShell.
+4. Перезапустите Codex или ChatGPT. Откройте **Plugins → Personal**, установите
+   **Telegram MCP** и начните новый чат с плагином. Если личный каталог был
+   переименован, выберите его существующее имя. В Codex CLI с поддержкой плагинов
+   используйте `/plugins` из [Windows-инструкции](INSTALL_WINDOWS.md).
 
-To enable text and document sending, run `current/tgsearch sending on` from the
-printed installation root and restart the clients. This adds four tools, for 17
-in total. Sending requires your explicit instruction; editing/deleting messages
-is not supported. See [sending instructions](README.md#optional-text-and-file-sending).
+Установщик добавляет плагин в личный каталог. Он не публикует его в общем магазине.
+Доступ к плагинам может ограничиваться политикой рабочего пространства. Обновление
+Windows выполняется повторным запуском установщика из нового релиза; вход сохраняется.
+[Команды установки, авторизации, проверки и удаления](INSTALL_WINDOWS.md).
 
-To check the installation in Terminal:
+## После подключения
 
-```sh
-"$HOME/Applications/TelegramSearchMCP/current/tgsearch" doctor --connect
-```
+Попросите: «Найди в моём Telegram сообщения со словами …» с известной вам фразой.
+По умолчанию доступны **15 инструментов**: поиск и чтение, навигация по чатам,
+вложения, голосовые и отдельный поиск публичных публикаций. Найденные сообщения
+передаются выбранному AI-клиенту. Секретные чаты не поддерживаются.
 
-Sign in once for both clients. A shared service handles simultaneous requests and
-starts automatically when first needed.
+Сначала агент ищет в доступной истории и подписках. Перед новым публичным поиском
+он проверяет текущую бесплатную квоту, объясняет возможный расход попытки,
+спрашивает разрешение и ждёт ответа. Сама проверка не расходует попытку.
+**Оплата Stars отключена.** Расшифровка голосовых выполняется Telegram по вашему
+запросу и подчиняется его квотам.
 
-## More help
+Отправка сообщений и изменение черновиков выключены. Команда `tgsearch sending on`
+через установленную точку входа добавляет ещё 4 инструмента; затем перезапустите
+клиент. [Правила отправки](README.md#optional-text-and-file-sending).
 
-- [Detailed installation, updates, and troubleshooting](INSTALL_MACOS.md)
-- [Uninstallation](UNINSTALL_MACOS.md)
-
-Share the [repository link](https://github.com/prabchevski/telegram-mcp) with
-friends. They can download and install it without a GitHub account or repository
-invitation. Each person signs in to their own Telegram account on their own Mac.
+Один вход обслуживает несколько чатов и клиентов. Передавайте друзьям
+[ссылку на репозиторий](https://github.com/prabchevski/telegram-mcp) или чистый архив
+релиза, **не** установленный профиль, базу или секреты. GitHub-аккаунт для загрузки
+не нужен. Каждый пользователь входит в свой Telegram на своём компьютере.

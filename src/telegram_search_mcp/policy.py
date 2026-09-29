@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from .paths import ensure_runtime_layout, policy_path
+from .platform_support import assert_private_path, secure_file, replace_private_file, private_temp_file
 
 POLICY_VERSION = 2
 SEARCH_SCOPE = "global_cloud_chats"
@@ -75,17 +75,14 @@ def new_policy(api_id: int) -> Policy:
 
 
 def _assert_private_file(path: Path) -> None:
-    if path.is_symlink():
-        raise PolicyError(f"Refusing symlinked profile file: {path}")
-    stat = path.stat()
-    if stat.st_uid != os.getuid():
-        raise PolicyError("Profile file is not owned by current user")
-    if stat.st_mode & 0o077:
-        raise PolicyError("Profile file permissions must be 0600")
+    try:
+        assert_private_path(path)
+    except RuntimeError as exc:
+        raise PolicyError(str(exc)) from exc
 
 
 def _atomic_private_json(path: Path, payload: dict[str, Any]) -> None:
-    descriptor, temporary_name = tempfile.mkstemp(prefix=".profile-", dir=path.parent)
+    descriptor, temporary_name = private_temp_file(path.parent, prefix=".profile-")
     temporary = Path(temporary_name)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
@@ -93,9 +90,9 @@ def _atomic_private_json(path: Path, payload: dict[str, Any]) -> None:
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
-        temporary.chmod(0o600)
-        temporary.replace(path)
-        path.chmod(0o600)
+        secure_file(temporary)
+        replace_private_file(temporary, path)
+        secure_file(path)
     finally:
         if temporary.exists():
             temporary.unlink()

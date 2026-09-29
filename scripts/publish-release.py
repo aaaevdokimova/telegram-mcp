@@ -35,7 +35,9 @@ def current_notes(source: Path, version: str) -> str:
         if expected not in (source / name).read_text():
             raise RuntimeError(f'{name} does not describe the current version')
     changes = sections[0].split('\n', 1)[1].strip()
-    return f'''Telegram MCP for Codex and Gemini CLI on macOS: chat navigation, unread history, search, local file downloads, Telegram-native voice/video-note transcription, and optional drafts, replies and scheduled text/document sending. Thirteen tools by default, seventeen with sending enabled.
+    return f'''Local Telegram MCP for **Codex on macOS and Windows x64**, **Gemini CLI on macOS**, and **ChatGPT Work on Windows x64**. Search chats and subscriptions, read history, download media, transcribe voice messages, and optionally prepare and send messages. Fifteen tools by default, nineteen with sending enabled.
+
+Public channel search is optional: first search account history, then check the account's actual free quota, explain the cost and wait for explicit user confirmation. Paid Stars searches are disabled in code.
 
 ## Changes in {version}
 
@@ -43,7 +45,18 @@ def current_notes(source: Path, version: str) -> str:
 
 ## Install or upgrade
 
-Download **telegram-mcp-macos.zip** and its **.sha256**, verify the checksum, extract it and open **install-macos.command**. A compatible Telegram login is preserved. Restart Codex/Gemini CLI after installation. Each user keeps their own Telegram account and credentials on their Mac.
+Give your local agent this instruction:
+
+> Install Telegram MCP from https://github.com/{REPOSITORY}. Read INSTALL.md, detect my operating system and client, install the latest verified release and check the connection. I will enter Telegram credentials in the local login window.
+
+| Platform and client | Download | Instructions |
+| --- | --- | --- |
+| macOS: Codex or Gemini CLI | [telegram-mcp-macos.zip](https://github.com/{REPOSITORY}/releases/download/v{version}/telegram-mcp-macos.zip) · [SHA-256](https://github.com/{REPOSITORY}/releases/download/v{version}/telegram-mcp-macos.zip.sha256) | [macOS setup](https://github.com/{REPOSITORY}/blob/v{version}/INSTALL_MACOS.md) |
+| Windows x64: Codex desktop or ChatGPT Work | [telegram-mcp-windows.zip](https://github.com/{REPOSITORY}/releases/download/v{version}/telegram-mcp-windows.zip) · [SHA-256](https://github.com/{REPOSITORY}/releases/download/v{version}/telegram-mcp-windows.zip.sha256) | [Windows setup](https://github.com/{REPOSITORY}/blob/v{version}/INSTALL_WINDOWS.md) |
+
+Verify the matching checksum before extracting. On Windows, run **install-windows.ps1** and enable the local Telegram MCP plugin in **Plugins → Personal** in Codex or ChatGPT Work. On macOS, open **install-macos.command** or follow the agent guide to register the requested client directly. Restart the client after installation. Compatible existing Telegram logins are preserved; every new user signs in to their own account locally.
+
+Windows updates are manual; rerun the new release's installer. The Windows installer and MCP launch are tested in native Windows CI; real client UI activation and account login happen on the user's computer. Native Windows ARM64 is not supported.
 
 [Installation guide](https://github.com/{REPOSITORY}/blob/v{version}/INSTALL.md) · [Verification and limits](https://github.com/{REPOSITORY}/blob/v{version}/VERIFICATION.md)
 
@@ -60,7 +73,7 @@ def prepare(source: Path, directory: Path) -> tuple[str, list[Path], Path]:
     notes = current_notes(source, version)
     archive = directory / f'telegram-mcp-macos-v{version}.zip'
     manifest = release.verify_archive(archive)
-    if manifest != release.manifest_for(release.inventory(source)):
+    if manifest != release.manifest_for(release.archive_payload(release.inventory(source))):
         raise RuntimeError('Archive does not match this checked commit')
     wheel = directory / f'telegram_search_mcp-{version}-py3-none-any.whl'
     release.verify_wheel(wheel, source)
@@ -75,9 +88,13 @@ def prepare(source: Path, directory: Path) -> tuple[str, list[Path], Path]:
     shutil.copyfile(archive, stable)
     stable_sum = stable.with_suffix('.zip.sha256')
     stable_sum.write_text(f'{hashlib.sha256(stable.read_bytes()).hexdigest()}  {stable.name}\n')
+    windows = directory / 'telegram-mcp-windows.zip'
+    shutil.copyfile(archive, windows)
+    windows_sum = windows.with_suffix('.zip.sha256')
+    windows_sum.write_text(f'{hashlib.sha256(windows.read_bytes()).hexdigest()}  {windows.name}\n')
     body = directory / 'release-notes.md'
     body.write_text(notes)
-    return version, [archive, checksum, inventory, wheel, stable, stable_sum], body
+    return version, [archive, checksum, inventory, wheel, stable, stable_sum, windows, windows_sum], body
 
 
 def api(path: str) -> dict | None:

@@ -29,6 +29,11 @@ def sending_enabled(root: Path | None = None) -> bool:
 
 def set_sending(root: Path, enabled: bool) -> None:
     """Only refresh registrations still exactly owned by this installation."""
+    import sys
+    if sys.platform == "win32":
+        from .windows_install import set_windows_sending
+        set_windows_sending(root, enabled)
+        return
     from .installation import installation_lock, read_receipt
     from .launchers import current_version
     from .registration import ALIASES, NAMES, _load, configure, expected_entry

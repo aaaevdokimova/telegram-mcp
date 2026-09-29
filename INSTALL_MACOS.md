@@ -1,4 +1,12 @@
-# Installation, updates, and troubleshooting
+# macOS: установка, обновления и устранение неполадок
+
+Этот установщик подключает локальный MCP к **Codex app/CLI, Gemini CLI или обоим**.
+Для установки нейронкой дайте ей ссылку на репозиторий и попросите следовать
+[INSTALL.md](INSTALL.md). Для кратких ручных шагов — [START_HERE.md](START_HERE.md).
+Windows использует отдельный [пакет и инструкцию](INSTALL_WINDOWS.md).
+
+Ниже приведены точные команды и подробности обновления. Первый вход выполняется
+в вашем локальном Terminal; секреты и QR-код не нужно передавать в чат.
 
 ## Requirements
 
@@ -13,13 +21,24 @@ For setup through Codex or Gemini CLI, use [INSTALL.md](INSTALL.md).
 
 ## Download and install
 
-[Download the verified release ZIP](https://github.com/prabchevski/telegram-mcp/releases/latest/download/telegram-mcp-macos.zip),
-extract it, and open `install-macos.command`. No GitHub account or manual build is
-required. You can also run a command from the extracted directory:
+Open the [latest published release](https://github.com/prabchevski/telegram-mcp/releases/latest).
+Under **Assets**, download `telegram-mcp-macos.zip` and
+`telegram-mcp-macos.zip.sha256` from that same release. No GitHub account or manual
+build is required. In Terminal, change to the directory containing both files and verify:
+
+```sh
+shasum -a 256 -c telegram-mcp-macos.zip.sha256
+```
+
+Continue only when the result is `OK`. Extract the ZIP, open `install-macos.command`,
+and select Codex, Gemini CLI or both. Alternatively, run **one** matching command
+from the extracted directory:
 
 ```sh
 bash install-macos.command --clients codex
+# Or, for Gemini CLI:
 bash install-macos.command --clients gemini
+# Or, only when both clients are wanted:
 bash install-macos.command --clients both
 ```
 
@@ -172,7 +191,7 @@ request starts it again. Restart/reload clients to apply a new registration.
 
 In Codex CLI, inspect `codex mcp get telegram_search`. In Gemini CLI, use
 `gemini mcp list` and `/mcp`; the working directory must be trusted by Gemini.
-Standard MCP discovery exposes 13 tools before authorization, including navigation,
+Standard MCP discovery exposes 15 tools before authorization, including navigation,
 local downloads, voice listing and explicitly requested speech recognition. Opt-in
 sending adds four tools; see README.md, Optional text and file sending.
 
@@ -210,8 +229,30 @@ Official references: [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surfa
 ## Voice recognition and workflow tools
 
 Telegram-native transcription, navigation and local downloads are registered by default:
-13 tools, or 17 when sending is enabled. Stop the idle old service and restart the MCP client
+15 tools, or 19 when sending is enabled. Stop the idle old service and restart the MCP client
 after this upgrade. Apple Silicon uses a locked TDLib wheel; Intel builds pinned
 source once and reuses it. Keep the adopted profile and Keychain in place. Do not
 roll back the native library after it has upgraded the Telegram database.
 See README.md for transcription states and Telegram account limits.
+
+
+## Public channel posts
+
+The agent searches your account history/subscriptions first, then may offer
+`telegram_search_public_posts` beyond your subscriptions. Before each new query,
+it calls the read-only `telegram_get_public_search_quota(query)`, explains the
+remaining free attempts, any wait and whether the query uses an attempt, and asks
+for explicit permission. It must wait for your answer. Limits come from Telegram,
+not a fixed assumed daily allowance. No search attempt is consumed by this check.
+
+The initial search requires the returned `confirmation_token` and
+`user_confirmed=true`. The token is single-use, valid for five minutes and bound
+to the account, query and quota snapshot. A changed quota or expired token means
+a fresh check and confirmation. The server verifies these fields; the agent is
+responsible for collecting the actual human consent. Same-query continuation
+using `next_cursor` is free and needs no new confirmation; a different query does.
+The tool always sends `star_count=0`: no paid search, Stars purchase or paid
+fallback is offered. Quota/access/unsupported outcomes are explicit.
+Restart the client after upgrading so its unchanged standard registration includes
+both new tools. Edited or removed registrations are preserved. This workflow is
+included in MCP instructions for every client, independently of `AGENTS.md`.

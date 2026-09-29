@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
+
+from .platform_support import ensure_private_dir
 
 APP_DIR_NAME = "TelegramSearchMCPShared"
 
@@ -35,23 +36,6 @@ def files_dir(profile: str = "default") -> Path:
 
 def lock_path(profile: str = "default") -> Path:
     return profile_root(profile) / "tdlib.lock"
-
-
-def ensure_private_dir(path: Path) -> None:
-    """Create a non-symlink directory owned by the current user with mode 0700."""
-
-    old_umask = os.umask(0o077)
-    try:
-        path.mkdir(mode=0o700, parents=True, exist_ok=True)
-    finally:
-        os.umask(old_umask)
-    resolved = path.resolve(strict=True)
-    if path.is_symlink() or resolved != path:
-        raise RuntimeError(f"Refusing symlinked runtime directory: {path}")
-    stat = path.stat()
-    if stat.st_uid != os.getuid():
-        raise RuntimeError(f"Runtime directory is not owned by current user: {path}")
-    path.chmod(0o700)
 
 
 def ensure_runtime_layout(profile: str = "default") -> None:

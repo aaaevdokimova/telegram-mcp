@@ -4,9 +4,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import errno
-import fcntl
 import os
-import pwd
 import re
 import stat
 import subprocess
@@ -15,6 +13,8 @@ import threading
 import time
 import uuid
 from typing import Any, Sequence
+
+from .platform_support import IS_WINDOWS, acquire_file_lock, trusted_home
 
 from .backend import MediaError, MediaQuality, MediaTooLargeError, RawMedia, RawMessage, RawMessagePage
 from .service import (
@@ -40,6 +40,10 @@ def _validate_socket(paths: ServicePaths) -> None:
     if not paths.directory.exists():
         raise _Unavailable("Telegram service is not running")
     prepare_service_paths(paths)
+    if paths.transport == "tcp":
+        if not service_lock_held(paths) or not paths.endpoint.exists():
+            raise _Unavailable("Telegram service is not running")
+        return
     try:
         info = paths.socket.lstat()
     except FileNotFoundError as exc:
@@ -74,12 +78,19 @@ async def _request(paths: ServicePaths, operation: str, params: dict[str, Any], 
     try:
         async with asyncio.timeout(timeout + 1.0):
             try:
-                reader, writer = await asyncio.open_unix_connection(str(paths.socket), limit=MAX_RESPONSE_BYTES + 4)
+                if paths.transport == "tcp":
+                    from .windows_transport import HOST, authenticate_client, read_endpoint
+                    endpoint = read_endpoint(paths.endpoint)
+                    reader, writer = await asyncio.open_connection(HOST, endpoint.port, limit=MAX_RESPONSE_BYTES + 4)
+                    await authenticate_client(reader, writer, endpoint.secret)
+                else:
+                    reader, writer = await asyncio.open_unix_connection(str(paths.socket), limit=MAX_RESPONSE_BYTES + 4)
             except OSError as exc:
-                if exc.errno in (errno.ENOENT, errno.ECONNREFUSED):
+                if isinstance(exc, (FileNotFoundError, ConnectionRefusedError)) or exc.errno in (errno.ENOENT, errno.ECONNREFUSED):
                     raise _Unavailable("Telegram service is not running") from exc
                 raise ServiceError("Unable to connect to the private Telegram service") from exc
-            require_same_user(writer.get_extra_info("socket"))
+            if paths.transport == "unix":
+                require_same_user(writer.get_extra_info("socket"))
             await write_frame(writer, request, MAX_REQUEST_BYTES)
             response = await read_frame(reader, MAX_RESPONSE_BYTES)
             if (not isinstance(response, dict) or type(response.get("protocol")) is not int
@@ -108,25 +119,46 @@ async def _status(paths: ServicePaths) -> dict[str, Any] | None:
         return None
 
 
+def clean_service_environment() -> dict[str, str]:
+    """Build a loader environment from OS account paths, never workspace .env."""
+    if IS_WINDOWS:
+        import win32api
+        from pathlib import Path
+        from .platform_support import ensure_private_dir, local_data_dir
+        home, local = trusted_home(), local_data_dir()
+        windows = Path(win32api.GetWindowsDirectory())
+        temporary = local / "TelegramMCP" / "temp"
+        ensure_private_dir(temporary)
+        return {"HOME": str(home), "USERPROFILE": str(home), "LOCALAPPDATA": str(local),
+                "SystemRoot": str(windows), "WINDIR": str(windows),
+                "PATH": str(windows / "System32") + ";" + str(windows),
+                "TEMP": str(temporary), "TMP": str(temporary), "LANG": "en_US.UTF-8"}
+    import pwd
+    account = pwd.getpwuid(os.getuid())
+    return {"HOME": account.pw_dir, "USER": account.pw_name, "LOGNAME": account.pw_name,
+            "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+            "LANG": "en_US.UTF-8"}
+
+
 def _spawn(profile: str, paths: ServicePaths) -> subprocess.Popen[bytes]:
     if paths != service_paths(profile):
         raise ServiceError("Custom test service paths require an explicitly injected starter")
     # Avoid inherited workspace variables affecting the interpreter or native
     # library loader. -I also ignores PYTHONPATH and user site packages.
-    account = pwd.getpwuid(os.getuid())
+    environment = clean_service_environment()
+    home = trusted_home()
     from .launchers import service_python
-    environment = {"HOME": account.pw_dir, "USER": account.pw_name, "LOGNAME": account.pw_name,
-                   "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
-                   "LANG": "en_US.UTF-8"}
     log_fd = open_private_file(paths.log)
     try:
         if os.fstat(log_fd).st_size > 64 * 1024:
             os.ftruncate(log_fd, 0)
         os.lseek(log_fd, 0, os.SEEK_END)
+        process_options = ({"creationflags": subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP}
+                           if IS_WINDOWS else {"start_new_session": True})
         child = subprocess.Popen(
             [service_python(), "-I", "-m", "telegram_search_mcp.service", "--profile", profile],
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=log_fd,
-            cwd=account.pw_dir, env=environment, start_new_session=True, close_fds=True,
+            cwd=home, env=environment, close_fds=True, **process_options,
         )
     finally:
         os.close(log_fd)
@@ -152,7 +184,7 @@ async def ensure_service(profile: str = "default", *, paths: ServicePaths | None
     try:
         while True:
             try:
-                fcntl.flock(startup_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquire_file_lock(startup_fd)
                 break
             except BlockingIOError:
                 if time.monotonic() >= deadline:
@@ -259,6 +291,14 @@ class SharedTelegramBackend(WorkflowMethods):
 
     async def _workflow(self, operation: str, params: dict) -> dict:
         return await self._call(operation, params)
+
+    async def get_public_search_quota(self, *, query: str) -> dict:
+        return await self._call("get_public_search_quota", {"query": query})
+
+    async def search_public_posts(self, *, query: str, cursor: str | None, limit: int,
+                                  confirmation_token: str | None = None, user_confirmed: bool = False) -> dict:
+        return await self._call("search_public_posts", {"query": query, "cursor": cursor, "limit": limit,
+                                "confirmation_token": confirmation_token, "user_confirmed": user_confirmed})
 
     async def search_messages(self, *, query: str, cursor: str | None, limit: int) -> RawMessagePage:
         return await self._call("search_messages", {"query": query, "cursor": cursor, "limit": limit})

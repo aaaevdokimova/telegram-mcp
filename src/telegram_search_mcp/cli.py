@@ -174,15 +174,15 @@ def _authorize_exclusive(args: argparse.Namespace) -> int:
 def command_doctor(args: argparse.Namespace) -> int:
     policy = Policy.load(args.profile)
     if get_secret("api_hash", args.profile) is None:
-        raise RuntimeError("api_hash is missing from macOS Keychain")
+        raise RuntimeError("api_hash is missing from the operating system credential store")
     if get_secret("database_key", args.profile) is None:
-        raise RuntimeError("TDLib database key is missing from macOS Keychain")
+        raise RuntimeError("TDLib database key is missing from the operating system credential store")
     library = next((path for path in tdjson_library_candidates() if Path(path).exists()), None)
     if library is None:
         raise RuntimeError("libtdjson is not installed")
     print(f"Profile: {args.profile}")
     print(f"TDLib: {library}")
-    print("Keychain credentials: present")
+    print("Operating system credentials: present")
     print(f"Account binding: {policy.expected_user_id or 'not authorized'}")
     if policy.expected_user_id is None:
         raise RuntimeError("Telegram authorization is incomplete. Run `tgsearch auth` locally.")
@@ -210,6 +210,8 @@ def command_service(args: argparse.Namespace) -> int:
 
 
 def command_update(args: argparse.Namespace) -> int:
+    if sys.platform == "win32":
+        raise RuntimeError("Windows updates are manual: run install-windows.ps1 from a verified new source archive. The saved Telegram login is preserved.")
     from .launchers import installed_root
     from .updater import update
     root = installed_root()
@@ -220,6 +222,11 @@ def command_update(args: argparse.Namespace) -> int:
 
 
 def command_updates(args: argparse.Namespace) -> int:
+    if sys.platform == "win32":
+        if args.action == "on":
+            raise RuntimeError("Automatic updates are not available on Windows; rerun install-windows.ps1 to update")
+        print(json.dumps({"automatic": False, "channel": "manual"}))
+        return 0
     from .activation import read_notice
     from .installation import read_receipt
     from .launchers import installed_root
@@ -263,7 +270,7 @@ def build_parser() -> argparse.ArgumentParser:
     auth.add_argument(
         "--replace-api-hash",
         action="store_true",
-        help="replace the api_hash stored in macOS Keychain",
+        help="replace the api_hash in the operating system credential store",
     )
     auth.set_defaults(handler=command_auth)
 

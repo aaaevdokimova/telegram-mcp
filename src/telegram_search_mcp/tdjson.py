@@ -208,6 +208,20 @@ class TdApi:
     def __init__(self, schema: TdlibSchema | str):
         self.schema = TdlibSchema.coerce(schema)
 
+    def get_public_post_search_limits(self, query: str) -> JsonObject:
+        if self.schema is not TdlibSchema.CURRENT:
+            raise ValueError("Public post search is unsupported by this TDLib schema")
+        return {"@type": "getPublicPostSearchLimits", "query": query}
+
+    def search_public_posts(self, query: str, *, offset: str = "", limit: int = 20) -> JsonObject:
+        if self.schema is not TdlibSchema.CURRENT:
+            raise ValueError("Public post search is unsupported by this TDLib schema")
+        if type(limit) is not int or not 1 <= limit <= 20:
+            raise ValueError("Public post search limit must be between 1 and 20")
+        # No caller/model-facing parameter can authorize payment.
+        return {"@type": "searchPublicPosts", "query": query, "offset": offset,
+                "limit": limit, "star_count": 0}
+
     @staticmethod
     def get_authorization_state() -> JsonObject:
         return {"@type": "getAuthorizationState"}
@@ -454,7 +468,7 @@ class JsonTransport(Protocol):
 
 
 def tdjson_library_candidates(explicit_path: str | os.PathLike[str] | None = None) -> tuple[Path, ...]:
-    """Return ordered macOS/Linux candidates without loading anything."""
+    """Return ordered native-library candidates without loading anything."""
 
     values: list[str] = []
     if explicit_path:
@@ -487,6 +501,7 @@ def infer_schema_from_library_path(path: str | os.PathLike[str]) -> TdlibSchema 
         resolved = str(Path(path).resolve())
     except OSError:
         resolved = os.fspath(path)
+    resolved = resolved.replace("\\", "/")
     if re.search(r"(?:^|[/.-])1\.8(?:\.0)?(?:[/.-]|$)", resolved):
         return TdlibSchema.V1_8
     return None
@@ -525,10 +540,11 @@ class CtypesTdJsonTransport:
     def _load_library(
         explicit_path: str | os.PathLike[str] | None,
     ) -> tuple[Path, ctypes.CDLL]:
+        from .native_runtime import load_library
         errors: list[str] = []
         for candidate in tdjson_library_candidates(explicit_path):
             try:
-                library = ctypes.CDLL(os.fspath(candidate))
+                library = load_library(candidate)
                 try:
                     resolved = candidate.resolve()
                 except OSError:

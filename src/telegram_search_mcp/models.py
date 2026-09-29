@@ -114,3 +114,59 @@ class TranscriptionResult(OutputModel):
     truncated: bool = False
     error_code: str | None = Field(default=None, max_length=100)
     retry_after_seconds: int | None = Field(default=None, ge=0)
+
+
+class PublicPostSearchQuota(OutputModel):
+    daily_free_query_count: int = Field(strict=True, ge=0, lt=2**31)
+    remaining_free_query_count: int = Field(strict=True, ge=0, lt=2**31)
+    next_free_query_in: int = Field(strict=True, ge=0, lt=2**31)
+    star_count: int = Field(strict=True, ge=0, lt=2**53, description="Informational price for non-free searches; never authorized or paid by this tool.")
+    is_current_query_free: bool = Field(strict=True)
+
+
+class PublicPostRecord(OutputModel):
+    chat_id: int = Field(strict=True, gt=-(2**53), lt=2**53)
+    channel_title: UntrustedText
+    username: UntrustedText | None
+    message_id: int = Field(strict=True, ge=1, lt=2**53)
+    sent_at: datetime
+    text: UntrustedText
+    content_type: str = Field(max_length=80)
+    public_url: str | None = Field(max_length=2048)
+
+
+class PublicPostSearchQuotaResult(OutputModel):
+    searched_scope: Literal["public_channel_posts"] = "public_channel_posts"
+    status: Literal["ok", "unavailable", "unsupported_feature", "failed"]
+    reason: Literal["free_quota_unavailable", "rate_limited", "premium_required", "account_restricted",
+                    "authorization_required", "telegram_refused", "unsupported_feature", "invalid_response",
+                    "native_timeout"] | None = None
+    normalized_query: str = Field(min_length=2, max_length=200)
+    search_performed: Literal[False] = False
+    quota: PublicPostSearchQuota | None
+    free_search_available: bool = Field(strict=True)
+    confirmation_token: str | None = Field(default=None, max_length=512)
+    confirmation_expires_in_seconds: int | None = Field(default=None, strict=True, ge=1, le=300)
+    retry_after_seconds: int | None = Field(default=None, strict=True, ge=0, lt=2**31)
+    stars_authorized: Literal[0] = 0
+
+
+class PublicPostSearchResult(OutputModel):
+    trust_boundary: TrustBoundary = Field(default_factory=TrustBoundary)
+    searched_scope: Literal["public_channel_posts"] = "public_channel_posts"
+    status: Literal["ok", "unavailable", "unsupported_feature", "failed", "confirmation_required", "quota_changed"]
+    reason: Literal["free_quota_unavailable", "rate_limited", "premium_required", "account_restricted",
+                    "authorization_required", "telegram_refused", "unsupported_feature", "invalid_response",
+                    "pagination_loop", "pagination_bound", "native_timeout", "explicit_confirmation_required",
+                    "invalid_confirmation_token", "quota_changed"] | None = None
+    normalized_query: str = Field(min_length=2, max_length=200)
+    search_performed: bool = Field(strict=True)
+    quota: PublicPostSearchQuota | None
+    quota_source: Literal["preflight", "post_search", "unavailable"]
+    retry_after_seconds: int | None = Field(default=None, strict=True, ge=0, lt=2**31)
+    stars_authorized: Literal[0] = 0
+    items: list[PublicPostRecord] = Field(max_length=20)
+    count: int = Field(strict=True, ge=0, le=20)
+    requested_limit: int = Field(strict=True, ge=1, le=20)
+    next_cursor: str | None = Field(max_length=512)
+    duplicates_omitted_count: int = Field(default=0, strict=True, ge=0, le=20)

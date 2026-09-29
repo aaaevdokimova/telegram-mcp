@@ -2,9 +2,9 @@
 from __future__ import annotations
 import hashlib
 import os
+import re
 from pathlib import Path
 import shutil
-import stat
 import uuid
 
 from pydantic import Field
@@ -12,6 +12,7 @@ from .backend import MediaError, MediaTooLargeError
 from .models import OutputModel, TrustBoundary
 from .navigation import Request, ChatId, Id, cloud_chat
 from .paths import ensure_private_dir
+from .platform_support import open_owned_readonly, open_private_file
 
 MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024
 
@@ -59,24 +60,27 @@ def export_file(source: Path, cache: Path, destination: Path, filename: str, max
         raise MediaError('TDLib returned an unsafe media path') from None
     ensure_private_dir(destination)
     folder = destination / uuid.uuid4().hex
-    folder.mkdir(mode=0o700)
+    ensure_private_dir(folder)
     # Names remain usable, but never select directories or hidden/control files.
-    name = ''.join(c for c in filename.replace('\\', '/').split('/')[-1] if c.isprintable() and c not in '/\\:')
+    name = ''.join(c for c in filename.replace('\\', '/').split('/')[-1] if c.isprintable() and c not in '/\\:<>"|?*')
     name = name.strip(' .')
     while len(name.encode('utf-8')) > 180:
         name = name[:-1]
     name = name or 'telegram-file.bin'
+    if re.match(r'^(CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])(?:\.|$)', name, re.IGNORECASE):
+        name = 'telegram-' + name
     target = folder / name
     try:
-        fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            fd = open_owned_readonly(source)
+        except RuntimeError as exc:
+            raise MediaError("Downloaded media must be a regular file owned by the current user") from exc
         with os.fdopen(fd, 'rb') as stream:
             info = os.fstat(stream.fileno())
-            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid():
-                raise MediaError('Downloaded media must be a regular file owned by the current user')
             if not 1 <= info.st_size <= maximum:
                 raise MediaTooLargeError('Downloaded file exceeds the requested limit or is empty')
             digest, size = hashlib.sha256(), 0
-            out_fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            out_fd = open_private_file(target, exclusive=True)
             with os.fdopen(out_fd, 'wb') as out:
                 while chunk := stream.read(1024 * 1024):
                     size += len(chunk)

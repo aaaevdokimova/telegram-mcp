@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import stat
@@ -10,24 +11,18 @@ import tempfile
 import tomllib
 from pathlib import Path
 
+from .tool_catalog import DEFAULT_TOOLS
+
 SERVER = "telegram_search"
 SETTINGS = {
-    "enabled_tools": (
-        '["telegram_search_messages", "telegram_get_message", '
-        '"telegram_get_context", "telegram_get_media"]'
-    ),
+    "enabled_tools": json.dumps(list(DEFAULT_TOOLS)),
     "default_tools_approval_mode": '"prompt"',
     "supports_parallel_tool_calls": "false",
     "startup_timeout_sec": "20",
     "tool_timeout_sec": "150",
 }
 EXPECTED_SETTINGS = {
-    "enabled_tools": [
-        "telegram_search_messages",
-        "telegram_get_message",
-        "telegram_get_context",
-        "telegram_get_media",
-    ],
+    "enabled_tools": list(DEFAULT_TOOLS),
     "default_tools_approval_mode": "prompt",
     "supports_parallel_tool_calls": False,
     "startup_timeout_sec": 20,

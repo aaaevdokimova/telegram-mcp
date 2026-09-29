@@ -61,7 +61,9 @@ for client, value in receipt['clients'].items():
     entry = data['mcp_servers']['telegram_search'] if client == 'codex' else data['mcpServers']['telegram-search']
     tools = entry['enabled_tools' if client == 'codex' else 'includeTools']
     assert {'telegram_list_voice_messages', 'telegram_transcribe_voice'} <= set(tools)
-    assert len(tools) == (17 if sys.argv[2] == 'on' else 13)
+    assert 'telegram_search_public_posts' in tools
+    assert 'telegram_get_public_search_quota' in tools
+    assert len(tools) == (19 if sys.argv[2] == 'on' else 15)
     assert (data['model'] if client == 'codex' else data['ui']['theme']) == 'preserved'
 assert len(notifications) == 1
 assert updater.update(root, scheduled=True)['status'] == 'not_due'
@@ -75,6 +77,26 @@ def load_script(name):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def codeload_snapshot(archive_path: Path, release) -> bytes:
+    """Recreate the exact Git-source files from a verified distribution archive.
+
+    The generated Windows entry points ship in release ZIPs, not in the Git
+    repository fetched by the old updater. Validate them before removing them;
+    everything else must reach the unmodified updater's real allowlist.
+    """
+    release.verify_archive(archive_path)
+    with zipfile.ZipFile(archive_path) as archive:
+        files = {item.filename.split('/', 1)[1]: archive.read(item)
+                 for item in archive.infolist() if not item.is_dir()}
+    files.pop(release.MANIFEST_NAME)
+    source = release.source_payload(files)
+    payload = io.BytesIO()
+    with zipfile.ZipFile(payload, 'w') as target:
+        for name, content in source.items():
+            target.writestr('telegram-mcp-' + CANDIDATE + '/' + name, content)
+    return payload.getvalue()
 
 
 def main():
@@ -99,17 +121,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix='telegram-upgrade-06-') as directory:
         temporary = Path(directory).resolve()
         legacy_source = extract_source(legacy_payload, LEGACY, temporary / 'legacy-source')
-        # Transform the verified release into the same file layout as codeload.
-        payload = io.BytesIO()
-        with zipfile.ZipFile(args.archive) as archive, zipfile.ZipFile(payload, 'w') as target:
-            for item in archive.infolist():
-                if item.is_dir():
-                    continue
-                name = item.filename.split('/', 1)[1]
-                if name != release.MANIFEST_NAME:
-                    target.writestr('telegram-mcp-' + CANDIDATE + '/' + name, archive.read(item))
         candidate = temporary / 'candidate.zip'
-        candidate.write_bytes(payload.getvalue())
+        candidate.write_bytes(codeload_snapshot(args.archive, release))
         for sending in ('off', 'on'):
             case = temporary / sending
             codex, gemini = case / 'codex/config.toml', case / 'gemini/settings.json'

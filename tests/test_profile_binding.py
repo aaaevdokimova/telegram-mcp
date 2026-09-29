@@ -1,5 +1,6 @@
 from contextlib import nullcontext
-import fcntl
+import pytest
+fcntl = pytest.importorskip("fcntl", reason="Legacy macOS profile adoption is POSIX-only")
 import json
 import os
 from pathlib import Path
