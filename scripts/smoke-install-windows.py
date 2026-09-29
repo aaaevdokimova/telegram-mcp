@@ -25,6 +25,7 @@ from pathlib import Path
 import platform
 import shutil
 import subprocess
+import sys
 import tempfile
 import zipfile
 
@@ -48,6 +49,18 @@ $system = Get-CimInstance -ClassName Win32_OperatingSystem
     PowerShellVersion = $PSVersionTable.PSVersion.ToString()
 } | ConvertTo-Json -Compress
 """
+
+
+def system_powershell() -> Path:
+    # powershell_path() imports pywin32. Keep that DLL out of this long-lived
+    # verifier: uv hardlinks its cached wheels into disposable environments, and
+    # Windows cannot delete their pywintypes DLL while another link is mapped.
+    completed = subprocess.run(
+        [sys.executable, "-I", "-X", "utf8", "-c",
+         "from telegram_search_mcp.windows_install import powershell_path; print(powershell_path())"],
+        check=True, capture_output=True, encoding="utf-8", timeout=30,
+    )
+    return Path(completed.stdout.strip())
 
 
 def read_windows_identity(powershell: Path) -> dict:
@@ -324,8 +337,7 @@ def main() -> None:
     try:
         if platform.system() != "Windows" or platform.machine().lower() not in {"amd64", "x86_64"}:
             raise RuntimeError("The actual installer smoke test requires native Windows x64")
-        from telegram_search_mcp.windows_install import powershell_path
-        powershell = powershell_path()
+        powershell = system_powershell()
         if not powershell.is_file():
             raise RuntimeError("System Windows PowerShell 5.1 must already be installed")
         identity = read_windows_identity(powershell)

@@ -161,8 +161,34 @@ def sha256(path: Path) -> str:
 
 
 def download(url: str, path: Path, expected: str, size: int | None = None) -> None:
-    run(["curl", "--fail", "--location", "--retry", "3", "--connect-timeout", "30",
-         "--max-time", "900", "--silent", "--show-error", url, "--output", str(path)])
+    budget = 12 * 60 if size is not None else 2 * 60
+    print(f"Downloading {path.name} (total retry budget: {budget}s)", flush=True)
+    command = ["curl", "--fail", "--location", "--retry", "2", "--retry-max-time", str(budget),
+               "--connect-timeout", "30", "--max-time", str(budget),
+               "--silent", "--show-error", url, "--output", str(path)]
+    # curl's retry-max-time does not bound a final in-progress attempt. Enforce
+    # one wall-clock budget around the entire process, including every retry.
+    with subprocess.Popen(command) as process:
+        deadline = time.monotonic() + budget
+        try:
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError(f"Download exceeded its total {budget}s budget: {path.name}")
+                try:
+                    result = process.wait(timeout=min(30, remaining))
+                except subprocess.TimeoutExpired:
+                    received = path.stat().st_size if path.exists() else 0
+                    total = f" / {size / 1024**2:.0f} MiB" if size is not None else ""
+                    print(f"Downloading {path.name}: {received / 1024**2:.0f} MiB{total}", flush=True)
+                    continue
+                if result != 0:
+                    raise subprocess.CalledProcessError(result, command)
+                break
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=10)
     if size is not None and path.stat().st_size != size:
         raise RuntimeError(f"Unexpected downloaded size: {path.name}")
     if sha256(path) != expected:
@@ -225,24 +251,12 @@ def capture(container: str, output: Path, debug: Path) -> None:
         shutil.copyfile(screen, output / "screen.ppm")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--windows", choices=WINDOWS_IMAGES, required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    args = parser.parse_args()
-    output = args.output.resolve()
-    output.mkdir(parents=True, exist_ok=True)
-    prepare_runner()
+def execute(args: argparse.Namespace, output: Path, provenance: dict, overall_deadline: float) -> None:
     repository = Path(__file__).resolve().parent.parent
     image = WINDOWS_IMAGES[args.windows]
-    provenance = {"status": "running", "expected_windows": args.windows,
-                  "github_sha": os.environ.get("GITHUB_SHA"), "evaluation_image": image,
-                  "vm_image": VM_IMAGE, "vm_source": VM_SOURCE,
-                  "host_architecture": platform.machine(), "kvm": True,
-                  "limitations": "Unattended evaluation VM; no Codex/ChatGPT graphical UI or Telegram authorization"}
-    (output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
     # VM disks and ISO images are deliberately outside the uploaded evidence tree.
-    with tempfile.TemporaryDirectory(prefix="telegram-desktop-", dir=os.environ["RUNNER_TEMP"]) as temporary:
+    with tempfile.TemporaryDirectory(prefix="telegram-desktop-", dir=os.environ["RUNNER_TEMP"],
+                                     ignore_cleanup_errors=True) as temporary:
         temporary_root = Path(temporary)
         storage = temporary_root / "storage"
         storage.mkdir()
@@ -268,7 +282,7 @@ def main() -> None:
         container = "telegram-desktop-" + args.windows
         started = False
         try:
-            run(["docker", "pull", "--platform", "linux/amd64", VM_IMAGE])
+            run(["docker", "pull", "--platform", "linux/amd64", VM_IMAGE], timeout=300)
             run(["docker", "run", "--detach", "--name", container,
                  "--platform", "linux/amd64", "--device=/dev/kvm", "--device=/dev/net/tun",
                  "--cap-add", "NET_ADMIN", "--stop-timeout", "30",
@@ -281,7 +295,7 @@ def main() -> None:
                  "--volume", f"{oem}:/oem:ro", "--volume", f"{shared}:/shared",
                  "--volume", f"{debug}:/debug", VM_IMAGE])
             started = True
-            deadline = time.monotonic() + 30 * 60
+            deadline = min(time.monotonic() + 30 * 60, overall_deadline)
             last_progress = ""
             while time.monotonic() < deadline:
                 if (shared / "complete.txt").is_file():
@@ -296,7 +310,7 @@ def main() -> None:
                     last_progress = recent
                 time.sleep(20)
             else:
-                raise RuntimeError("Windows installation/acceptance exceeded its 30 minute limit")
+                raise RuntimeError("Windows acceptance exceeded the 30 minute VM or 40 minute total run budget")
             for item in shared.iterdir():
                 if item.is_file() and item.suffix in {".json", ".log", ".txt"}:
                     shutil.copyfile(item, output / item.name)
@@ -327,12 +341,47 @@ def main() -> None:
             raise
         finally:
             if started:
-                capture(container, output, debug)
-                subprocess.run(["docker", "rm", "--force", container], timeout=60)
-            (output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
+                # Diagnostic/cleanup errors must not replace the test failure.
+                try:
+                    capture(container, output, debug)
+                except Exception as error:
+                    provenance.setdefault("diagnostic_errors", []).append(str(error))
+                try:
+                    run(["docker", "rm", "--force", container], timeout=60)
+                except Exception as error:
+                    provenance.setdefault("cleanup_errors", []).append(str(error))
             # The container writes root-owned VM files. Cleanup stays confined to
             # our freshly allocated directory on the guarded ephemeral runner.
-            run(["sudo", "-n", "chown", "-R", f"{os.getuid()}:{os.getgid()}", str(temporary_root)])
+            try:
+                run(["sudo", "-n", "chown", "-R", f"{os.getuid()}:{os.getgid()}", str(temporary_root)], timeout=60)
+            except Exception as error:
+                provenance.setdefault("cleanup_errors", []).append(str(error))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--windows", choices=WINDOWS_IMAGES, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    output = args.output.resolve()
+    output.mkdir(parents=True, exist_ok=True)
+    provenance = {"status": "running", "expected_windows": args.windows,
+                  "github_sha": os.environ.get("GITHUB_SHA"), "evaluation_image": WINDOWS_IMAGES[args.windows],
+                  "vm_image": VM_IMAGE, "vm_source": VM_SOURCE,
+                  "host_architecture": platform.machine(), "kvm": False,
+                  "limitations": "Unattended evaluation VM; no Codex/ChatGPT graphical UI or Telegram authorization"}
+    (output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
+    overall_deadline = time.monotonic() + 40 * 60
+    try:
+        prepare_runner()
+        provenance["kvm"] = True
+        execute(args, output, provenance, overall_deadline)
+    except BaseException as error:
+        provenance["status"] = "failed"
+        provenance["error"] = str(error)
+        raise
+    finally:
+        (output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
 
 
 if __name__ == "__main__":

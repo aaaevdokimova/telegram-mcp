@@ -73,7 +73,7 @@ def test_failed_desktop_acceptance_replaces_old_success_report_before_installati
                                     '--report-path', str(report)])
     monkeypatch.setattr(windows_smoke.platform, 'system', lambda: 'Windows')
     monkeypatch.setattr(windows_smoke.platform, 'machine', lambda: 'AMD64')
-    monkeypatch.setattr(installer, 'powershell_path', lambda: powershell)
+    monkeypatch.setattr(windows_smoke, 'system_powershell', lambda: powershell)
     monkeypatch.setattr(windows_smoke, 'read_windows_identity', lambda _: windows_identity('26100', 3))
     monkeypatch.setattr(windows_smoke, 'exercise_archive', lambda *_: pytest.fail('Server must not run desktop checks'))
     with pytest.raises(RuntimeError, match='actual OS is Windows Server'):
@@ -88,6 +88,31 @@ def test_failed_desktop_acceptance_replaces_old_success_report_before_installati
     assert evidence['client_ui_tested'] is False
     assert evidence['telegram_authorization_performed'] is False
     assert evidence['error']['type'] == 'RuntimeError'
+
+
+@pytest.mark.skipif(sys.platform != 'win32', reason='Native Windows DLL mapping lifetime')
+def test_smoke_powershell_lookup_does_not_pin_pywin32_dll_in_verifier():
+    # A mapped cached pywin32 DLL prevents deleting uv's hardlinks in disposable
+    # installations. Use a fresh process: other pytest tests may map it normally.
+    script = Path(__file__).resolve().parents[1] / 'scripts' / 'smoke-install-windows.py'
+    check = '''
+import ctypes
+import importlib.util
+import sys
+spec = importlib.util.spec_from_file_location('windows_smoke', sys.argv[1])
+smoke = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(smoke)
+kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+kernel32.GetModuleHandleW.argtypes = [ctypes.c_wchar_p]
+kernel32.GetModuleHandleW.restype = ctypes.c_void_p
+dll = f'pywintypes{sys.version_info.major}{sys.version_info.minor}.dll'
+assert not kernel32.GetModuleHandleW(dll), 'Test process must initially have no pywin32 DLL mapping'
+assert smoke.system_powershell().is_file()
+assert 'win32api' not in sys.modules and 'pywintypes' not in sys.modules
+assert not kernel32.GetModuleHandleW(dll), 'Verifier must not pin the DLL while cleaning hardlinked environments'
+'''
+    subprocess.run([sys.executable, '-I', '-c', check, str(script)],
+                   check=True, capture_output=True, timeout=60)
 
 
 def test_new_marketplace_and_existing_settings_are_preserved():
