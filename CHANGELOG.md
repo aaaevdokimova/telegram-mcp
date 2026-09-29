@@ -4,7 +4,7 @@
 
 - Make all user-facing documentation, installation instructions and examples English, including the README, quick start and both platform guides.
 - Record the actual Windows edition, build and architecture during installer verification. Desktop-specific checks reject Windows Server and the wrong desktop version instead of treating them as equivalent.
-- Add isolated Windows 10 and Windows 11 desktop installation checks; see VERIFICATION.md for the measured results and remaining client UI acceptance scope.
+- Verify installation and updates on actual Windows 10 Enterprise 22H2 and Windows 11 Enterprise 25H2 x64 VMs, with 13 acceptance checks passing on each. Require both desktop checks before publishing a release; see VERIFICATION.md for measured builds and the remaining client UI/login acceptance scope.
 
 ## 0.9.1 — 2026-09-29
 

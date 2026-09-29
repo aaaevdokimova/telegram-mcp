@@ -1,8 +1,6 @@
 name: Windows 10 and 11 desktop installation
 
 on:
-  push:
-    branches: [english-desktop-validation]
   workflow_dispatch:
   workflow_call:
 

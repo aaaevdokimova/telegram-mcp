@@ -49,8 +49,11 @@ See the [detailed guide, upgrades from older versions, and removal](INSTALL_MACO
 
 You need internet access and a client with local plugin support. Administrator
 rights and WSL are not required. This package does not support native Windows ARM64.
-Existing automated Windows checks run on Windows Server 2025; separate Windows 10
-and Windows 11 installation checks are not yet complete. See [VERIFICATION.md](VERIFICATION.md).
+Checks passed on Windows Server 2025 and separate x64 Windows 10 Enterprise
+Evaluation 22H2 and Windows 11 Enterprise Evaluation 25H2 virtual machines. The
+desktop runs verified installation, reinstallation, and MCP discovery as a
+standard user; real Telegram login and the client interface remain unverified.
+See [VERIFICATION.md](VERIFICATION.md) for exact builds and evidence.
 
 1. In the [latest release](https://github.com/prabchevski/telegram-mcp/releases/latest),
    download `telegram-mcp-windows.zip` and its `.sha256` from the same release.

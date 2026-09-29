@@ -35,7 +35,7 @@ On macOS, installation enables daily updates from `main` after successful checks
 
 The agent searches your accessible account history and subscriptions first. Before a separate public-post search, it checks the actual remaining free quota, explains any attempt it would consume, and **waits for your permission**. Stars payments are disabled. The default installation exposes 15 tools; sending is off and adds four tools only when enabled. See [public search](#free-public-channel-post-search) and [sending](#optional-text-and-file-sending).
 
-Automated checks cover the core on macOS, Linux, and Windows Server 2025, as well as installers and MCP connections. Windows 10 and Windows 11 are not yet separately verified. Real Telegram login and the selected client's interface must be checked on the user's computer. Intel macOS builds the pinned TDLib version; automated Mac installation checks run on Apple Silicon. See [VERIFICATION.md](VERIFICATION.md) for the exact coverage and limitations.
+Automated checks cover the core on macOS, Linux, and Windows Server 2025, as well as installers and MCP connections. Separate installation checks passed on x64 Windows 10 Enterprise Evaluation 22H2 (build 19045.2006) and Windows 11 Enterprise Evaluation 25H2 (build 26200.6584) virtual machines, using a standard user account. These checks verified installation, reinstallation, and MCP discovery; real Telegram login and the selected client's interface remain unverified. Intel macOS builds the pinned TDLib version; automated Mac installation checks run on Apple Silicon. See [VERIFICATION.md](VERIFICATION.md) for the exact coverage and limitations.
 
 ## Features
 

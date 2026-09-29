@@ -56,7 +56,7 @@ Give your local agent this instruction:
 
 Verify the matching checksum before extracting. On Windows, run **install-windows.ps1** and enable the local Telegram MCP plugin in **Plugins → Personal** in Codex or ChatGPT Work. On macOS, open **install-macos.command** or follow the agent guide to register the requested client directly. Restart the client after installation. Compatible existing Telegram logins are preserved; every new user signs in to their own account locally.
 
-Windows updates are manual; rerun the new release's installer. The Windows installer and MCP launch are tested in native Windows CI; real client UI activation and account login happen on the user's computer. Native Windows ARM64 is not supported.
+Windows updates are manual; rerun the new release's installer. Installation, updates and MCP discovery passed 13 checks each on Windows 10 Enterprise 22H2 and Windows 11 Enterprise 25H2 x64 evaluation VMs under a standard user. Release CI repeats both desktop checks before publication. Real client UI activation and Telegram account login still require acceptance on the user's computer; see the verification guide for VM configuration and coverage limits. Native Windows ARM64 is not supported.
 
 [Installation guide](https://github.com/{REPOSITORY}/blob/v{version}/INSTALL.md) · [Verification and limits](https://github.com/{REPOSITORY}/blob/v{version}/VERIFICATION.md)
 

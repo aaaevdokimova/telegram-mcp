@@ -22,7 +22,7 @@ Give your local agent the repository link and say: “Install Telegram MCP for C
 
 A new installation exposes 15 tools. Sending messages and changing drafts are disabled. Retrieved messages and media are shared with the selected AI client when tools are used. Secret Chats are not supported.
 
-This package registers a local plugin; it is not published in OpenAI's public marketplace. Workspace policies may also restrict plugin access. Automated installation, generated-configuration, and MCP checks currently run on Windows Server 2025. They do not separately verify Windows 10 or Windows 11. The Codex/ChatGPT interface and real account login must be checked on the target computer; see [VERIFICATION.md](VERIFICATION.md). Do not add a duplicate server manually in `config.toml` alongside the plugin.
+This package registers a local plugin; it is not published in OpenAI's public marketplace. Workspace policies may also restrict plugin access. Automated checks cover Windows Server 2025. Separate installation, reinstallation, generated-configuration, and MCP discovery checks passed on x64 Windows 10 Enterprise Evaluation 22H2 (build 19045.2006) and Windows 11 Enterprise Evaluation 25H2 (build 26200.6584) virtual machines. Both desktop runs used a standard user account, PowerShell 5.1, and Python 3.13.13. The Codex/ChatGPT interface and real Telegram login remain unverified and must be checked on the target computer; see [VERIFICATION.md](VERIFICATION.md). Do not add a duplicate server manually in `config.toml` alongside the plugin.
 
 The agent searches your accessible account history and subscriptions first. It
 may then offer a separate public-post search, including channels you do not

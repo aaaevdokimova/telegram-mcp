@@ -34,8 +34,11 @@ limitation; do not create a different connection method without an agreed reques
 Check that the selected client is installed and supports this route. On Windows,
 plugin access can depend on the app version and workspace policy. Configuration
 instructions do not prove that the plugin is already active in the interface.
-See [VERIFICATION.md](VERIFICATION.md) for tested environments: the existing Windows
-CI runs on Windows Server 2025, not separate Windows 10 and Windows 11 machines.
+Windows checks cover Windows Server 2025 and separate x64 Windows 10 Enterprise
+Evaluation 22H2 and Windows 11 Enterprise Evaluation 25H2 virtual machines. The
+desktop checks passed as a standard user and verified installation, reinstallation,
+and MCP discovery; they did not verify real Telegram login or the client interface.
+See [VERIFICATION.md](VERIFICATION.md) for exact builds and evidence.
 
 ## 2. Download a published release and verify the archive
 
