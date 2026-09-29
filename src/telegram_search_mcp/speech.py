@@ -41,7 +41,7 @@ def transcribe(session, directory: Path, *, chat_id: int, message_id: int,
     marker = directory / f"{chat_id}_{message_id}.json"
     if marker.exists() or marker.is_symlink():
         _assert_private_file(marker)
-        if marker.stat().st_size > 1024 or json.loads(marker.read_text()).get("user_id") != session.user_id:
+        if marker.stat().st_size > 1024 or json.loads(marker.read_text(encoding="utf-8")).get("user_id") != session.user_id:
             raise MediaError("Speech request belongs to a different account or is invalid")
 
     def fetch():

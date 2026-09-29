@@ -92,7 +92,7 @@ def set_draft(session, request: SetDraftRequest, directory: Path) -> dict:
         _assert_private_file(path)
         if path.stat().st_size > 65536:
             raise ValueError('Invalid draft operation record')
-        previous = json.loads(path.read_text())
+        previous = json.loads(path.read_text(encoding="utf-8"))
         if previous['user_id'] != session.user_id or previous['spec'] != spec:
             raise ValueError('operation_id belongs to different content or account')
         return previous['result']

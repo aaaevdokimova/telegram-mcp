@@ -20,7 +20,7 @@ class Session:
         self.dispatched = []
 
     def get_chat(self, chat_id, timeout=30):
-        return {"@type": "chat", "id": chat_id, "title": "Synthetic", "type": {"@type": "chatTypePrivate"}, "draft_message": None}
+        return {"@type": "chat", "id": chat_id, "title": "Проверка 💬", "type": {"@type": "chatTypePrivate"}, "draft_message": None}
 
     def request(self, request, timeout=30):
         kind = request["@type"]
@@ -37,10 +37,12 @@ class Session:
 
 def test_draft_dispatch_marker_survives_process_restart(tmp_path):
     root = tmp_path.resolve() / "drafts"
-    request = SetDraftRequest(chat_id=123, operation_id=uuid.uuid4().hex, text="synthetic", expected_version=version(None))
+    request = SetDraftRequest(chat_id=123, operation_id=uuid.uuid4().hex, text="Привет, мир 👋 — проверка UTF-8", expected_version=version(None))
     first, restarted = Session(), Session()
     assert set_draft(first, request, root)["status"] == "unknown"
-    assert set_draft(restarted, request, root)["status"] == "unknown"
+    recovered = set_draft(restarted, request, root)
+    assert recovered["status"] == "unknown"
+    assert recovered["text"]["value"] == request.text
     assert first.dispatched == ["setChatDraftMessage"]
     assert restarted.dispatched == []
     assert_private_path(root / (request.operation_id + ".json"))
@@ -59,7 +61,7 @@ def test_speech_dispatch_marker_survives_process_restart(tmp_path):
 def test_outbox_preserves_uncertain_dispatch_with_private_snapshot(tmp_path):
     root = tmp_path.resolve() / "source"
     ensure_private_dir(root)
-    source = root / "attachment.txt"
+    source = root / "план 📄.txt"
     fd = open_private_file(source, exclusive=True)
     os.write(fd, b"synthetic attachment")
     os.close(fd)
@@ -67,11 +69,15 @@ def test_outbox_preserves_uncertain_dispatch_with_private_snapshot(tmp_path):
     first = Session()
     box = Outbox(outbox_path, first.user_id)
     draft_id = uuid.uuid4().hex
-    box.prepare(first, draft_id=draft_id, recipient="123", text="synthetic", file_path=str(source))
-    assert_private_path(outbox_path / draft_id / "attachment.txt")
+    box.prepare(first, draft_id=draft_id, recipient="123", text="Привет, мир 👋 — проверка UTF-8", file_path=str(source))
+    assert_private_path(outbox_path / draft_id / "план 📄.txt")
     assert box.send(first, draft_id=draft_id)["status"] == "unknown"
     restarted = Session()
-    assert Outbox(outbox_path, restarted.user_id).send(restarted, draft_id=draft_id)["status"] == "unknown"
+    recovered = Outbox(outbox_path, restarted.user_id).send(restarted, draft_id=draft_id)
+    assert recovered["status"] == "unknown"
+    assert recovered["text"] == "Привет, мир 👋 — проверка UTF-8"
+    assert recovered["chat_title"] == "Проверка 💬"
+    assert recovered["file_name"] == "план 📄.txt"
     assert first.dispatched == ["sendMessage"]
     assert restarted.dispatched == []
 

@@ -94,7 +94,7 @@ class Outbox:
         _assert_private_file(path)
         if path.stat().st_size > 65536:
             raise ValueError("Invalid outgoing draft")
-        value = json.loads(path.read_text())
+        value = json.loads(path.read_text(encoding="utf-8"))
         if value["user_id"] != self.user_id or value["draft_id"] != draft_id:
             raise ValueError("Outgoing draft belongs to a different Telegram account")
         return value

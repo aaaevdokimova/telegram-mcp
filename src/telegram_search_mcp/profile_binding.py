@@ -35,7 +35,7 @@ def read_binding() -> str | None:
         raise RuntimeError("Legacy macOS profile bindings cannot be used on Windows; authorize a new local profile")
     if path.stat().st_size > 1024:
         raise RuntimeError("Invalid profile binding")
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict) or set(data) != {"schema", "source"} or data["schema"] != 1 or data["source"] not in LEGACY:
         raise RuntimeError("Unsupported profile binding")
     return data["source"]
@@ -68,7 +68,7 @@ def inspect_legacy(source: str) -> dict | None:
     _private(policy)
     if policy.stat().st_size > 8192:
         raise RuntimeError("Legacy profile policy is too large")
-    data = json.loads(policy.read_text())
+    data = json.loads(policy.read_text(encoding="utf-8"))
     if (data.get("version") != 2 or data.get("search_scope") != "global_cloud_chats"
             or type(data.get("api_id")) is not int or data["api_id"] <= 0
             or type(data.get("expected_user_id")) is not int or data["expected_user_id"] <= 0):

@@ -165,3 +165,54 @@ def test_windows_acl_validation_fails_closed(monkeypatch):
         state.update(changed)
         with pytest.raises(RuntimeError):
             platform._check_windows_handle(1, directory=False, private=True)
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_windows_token_handle_without_context_manager_is_closed(monkeypatch, fail):
+    class Handle:
+        closed = False
+        def Close(self):
+            self.closed = True
+    token = Handle()  # pywin32 311 PyHANDLE deliberately has no __enter__/__exit__.
+    def token_information(handle, kind):
+        assert handle is token
+        if fail:
+            raise RuntimeError("synthetic token failure")
+        return ("current-sid", 0)
+    monkeypatch.setitem(sys.modules, "win32api", SimpleNamespace(GetCurrentProcess=lambda: 1))
+    monkeypatch.setitem(sys.modules, "win32con", SimpleNamespace(TOKEN_QUERY=8))
+    monkeypatch.setitem(sys.modules, "win32security", SimpleNamespace(
+        OpenProcessToken=lambda *args: token, GetTokenInformation=token_information, TokenUser=1))
+    if fail:
+        with pytest.raises(RuntimeError, match="synthetic token failure"):
+            platform._user_sid()
+    else:
+        assert platform._user_sid() == "current-sid"
+    assert token.closed
+
+
+@pytest.mark.parametrize("check", ["assert_private_path", "assert_safe_path"])
+@pytest.mark.parametrize("fail", [False, True])
+def test_windows_file_handle_without_context_manager_is_closed(monkeypatch, tmp_path, check, fail):
+    class Handle:
+        closed = False
+        def Close(self):
+            self.closed = True
+    handle = Handle()
+    def inspect(*args, **kwargs):
+        if fail:
+            raise RuntimeError("synthetic ACL failure")
+    descriptor = SimpleNamespace(GetSecurityDescriptorDacl=lambda: SimpleNamespace(GetAceCount=lambda: 0))
+    monkeypatch.setattr(platform, "IS_WINDOWS", True)
+    monkeypatch.setattr(platform, "_windows_open", lambda *args, **kwargs: handle)
+    monkeypatch.setattr(platform, "_check_windows_handle", inspect)
+    monkeypatch.setattr(platform, "_user_sid", lambda: "current-sid")
+    monkeypatch.setitem(sys.modules, "win32security", SimpleNamespace(
+        GetSecurityInfo=lambda *args: descriptor, SE_FILE_OBJECT=1, DACL_SECURITY_INFORMATION=4,
+        ConvertSidToStringSid=lambda sid: sid))
+    if fail:
+        with pytest.raises(RuntimeError, match="synthetic ACL failure"):
+            getattr(platform, check)(tmp_path.resolve())
+    else:
+        getattr(platform, check)(tmp_path.resolve())
+    assert handle.closed

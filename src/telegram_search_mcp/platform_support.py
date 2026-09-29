@@ -38,8 +38,11 @@ def _user_sid():
     import win32api
     import win32con
     import win32security
-    with win32security.OpenProcessToken(win32api.GetCurrentProcess(), win32con.TOKEN_QUERY) as token:
+    token = win32security.OpenProcessToken(win32api.GetCurrentProcess(), win32con.TOKEN_QUERY)
+    try:
         return win32security.GetTokenInformation(token, win32security.TokenUser)[0]
+    finally:
+        token.Close()
 
 
 def _security_attributes():
@@ -136,8 +139,11 @@ def _windows_open(path: Path, *, writable: bool, create: bool = False, exclusive
 def assert_private_path(path: Path, *, directory: bool = False) -> None:
     reject_links(path)
     if IS_WINDOWS:
-        with _windows_open(path, writable=False, directory=directory) as handle:
+        handle = _windows_open(path, writable=False, directory=directory)
+        try:
             _check_windows_handle(handle, directory=directory, private=True)
+        finally:
+            handle.Close()
         return
     info = path.lstat()
     if info.st_uid != os.getuid() or info.st_mode & 0o077:
@@ -164,7 +170,8 @@ def assert_safe_path(path: Path, *, directory: bool = False) -> None:
             raise RuntimeError("Config must be owned by the current user and not writable by other users")
         return
     import win32security
-    with _windows_open(path, writable=False, directory=directory) as handle:
+    handle = _windows_open(path, writable=False, directory=directory)
+    try:
         _check_windows_handle(handle, directory=directory, private=False, allow_system_owner=True)
         descriptor = win32security.GetSecurityInfo(handle, win32security.SE_FILE_OBJECT, win32security.DACL_SECURITY_INFORMATION)
         dacl = descriptor.GetSecurityDescriptorDacl()
@@ -178,6 +185,8 @@ def assert_safe_path(path: Path, *, directory: bool = False) -> None:
                 raise RuntimeError("Config has an unsupported Windows ACL")
             if ace[0][0] == win32security.ACCESS_ALLOWED_ACE_TYPE and ace[1] & write_access and win32security.ConvertSidToStringSid(ace[2]) not in allowed_writers:
                 raise RuntimeError("Config must not be writable by other users")
+    finally:
+        handle.Close()
 
 def ensure_private_dir(path: Path) -> None:
     reject_links(path)
