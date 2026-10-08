@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.3 — 2026-10-08
+
+- Include the previously local read-reliability fix in the public release: preserve exact TDLib message IDs, native continuations, date boundaries, and context across short or empty pages.
+- Keep the shared service alive after ordinary Telegram read errors and report operation-specific diagnostics without private message content.
+- Explain unpublished local revisions instead of an opaque update HTTP 404; expose the last scheduled update failure in `tgsearch updates status`. Local fixes are never silently overwritten.
+- Run native-ID and service error regressions on macOS/Linux and Windows. Add an explicit installed-release live-read verifier and require maintainers to reconcile local fixes before releasing.
+
 ## 0.9.2 — 2026-09-29
 
 - Make all user-facing documentation, installation instructions and examples English, including the README, quick start and both platform guides.

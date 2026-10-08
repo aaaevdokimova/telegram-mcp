@@ -106,6 +106,10 @@ jobs:
           tests/test_public_posts_safety.py
           tests/test_public_search_consent.py
           tests/test_navigation.py
+          tests/test_read_navigation_regressions.py
+          tests/test_context_regressions.py
+          tests/test_read_error_regressions.py
+          tests/test_read_service_regressions.py
           tests/test_server.py
           tests/test_speech.py
           tests/test_tdjson.py

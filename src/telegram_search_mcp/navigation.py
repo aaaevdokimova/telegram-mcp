@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from .models import OutputModel, TrustBoundary, UntrustedText, MessageRecord
-from .tdjson import TdlibError
+from .tdjson import TdlibError, TdlibProtocolError
 
 def nonzero(value: int) -> int:
     if value == 0:
@@ -173,6 +173,10 @@ def message_record(message: dict, chat: dict) -> HistoryMessage:
 
 def fingerprint(params: dict, user_id: int) -> str:
     value = {k: v for k, v in params.items() if k not in {"cursor", "limit"}}
+    # Bind to effective date bounds, not spelling (Z and +00:00 are identical).
+    for key in ("date_from", "date_to"):
+        if key in value:
+            value[key] = timestamp(value[key])
     return hashlib.sha256(json.dumps([user_id, value], sort_keys=True).encode()).hexdigest()[:24]
 
 
@@ -184,12 +188,16 @@ def cursor_position(cursor: str | None, fingerprint: str) -> int:
     if cursor is None:
         return 0
     try:
-        position, digest = json.loads(base64.b64decode(cursor, altchars=b"-_", validate=True))
+        value = json.loads(base64.b64decode(cursor, altchars=b"-_", validate=True))
+        if not isinstance(value, list) or len(value) != 2:
+            raise ValueError()
+        position, digest = value
         if type(position) is not int or not 0 < position < 2**53 or digest != fingerprint:
             raise ValueError()
         return position
     except (ValueError, TypeError, UnicodeError):
-        raise ValueError("Invalid cursor or changed filters; start a new search") from None
+        from .tdlib_backend import CursorError
+        raise CursorError("Invalid cursor or changed filters; start a new search") from None
 
 
 class Navigation:
@@ -209,7 +217,8 @@ class Navigation:
                 if expected != digest or not 0 <= offset <= len(ids):
                     raise ValueError()
             except (KeyError, ValueError, TypeError):
-                raise ValueError("Chat cursor expired or filters changed; start a new listing") from None
+                from .tdlib_backend import CursorError
+                raise CursorError("Chat cursor expired or filters changed; start a new listing") from None
         else:
             query = request.query.strip()
             if query.startswith("@"):
@@ -249,10 +258,12 @@ class Navigation:
         unread = getattr(request, "unread_only", False)
         read_id = chat.get("last_read_inbox_message_id", 0)
         start_id = before
+        include_start = False
         if not before and high:
             try:
                 anchor = session.request({"@type": "getChatMessageByDate", "chat_id": request.chat_id, "date": high - 1})
-                start_id = int(anchor["id"]) + 1
+                start_id = int(anchor["id"])
+                include_start = True
             except TdlibError as exc:
                 if exc.code == 404:
                     return HistoryPage(items=[], next_cursor=None, scanned_count=0).model_dump(mode="json")
@@ -263,7 +274,11 @@ class Navigation:
         for _ in range(5):
             if time.monotonic() >= deadline:
                 break
-            payload = {"chat_id": request.chat_id, "from_message_id": max(0, start_id - 1), "offset": 0, "limit": 50}
+            # Message IDs are structured TDLib identifiers, not integer offsets.
+            # In the pinned runtime offset=0 excludes an exact anchor; -1 keeps
+            # the first date-bound anchor (OrderedMessages::get_history).
+            payload = {"chat_id": request.chat_id, "from_message_id": start_id,
+                       "offset": -1 if include_start else 0, "limit": 50}
             if isinstance(request, ScheduledRequest):
                 payload = {"@type": "getChatScheduledMessages", "chat_id": request.chat_id}
             elif isinstance(request, ThreadRequest):
@@ -276,11 +291,23 @@ class Navigation:
             else:
                 payload.update({"@type": "getChatHistory", "only_local": False})
             response = session.request(payload, timeout=max(1, min(15, deadline - time.monotonic())))
-            rows = sorted(response.get("messages", []), key=lambda m: m["id"], reverse=True)
+            rows = sorted((m for m in response.get("messages", []) if m is not None),
+                          key=lambda m: m["id"], reverse=True)
+            search_next = response.get("next_from_message_id") if isinstance(request, SearchRequest) else None
+            if search_next is not None:
+                if type(search_next) is not int or not 0 <= search_next < 2**53:
+                    raise TdlibProtocolError("Invalid chat-search continuation returned by TDLib")
+                # A date anchor that doesn't match the query can make offset=-1
+                # return one newer match. It is filtered below; its continuation
+                # is still valid when the next request switches to offset=0.
+                if search_next and start_id and not include_start and search_next >= start_id:
+                    raise TdlibProtocolError("Chat-search continuation did not advance")
+                if search_next and rows and search_next > min(row["id"] for row in rows):
+                    raise TdlibProtocolError("Chat-search continuation overlaps returned messages")
             progressed, finished = False, False
-            for message in rows:
+            for index, message in enumerate(rows):
                 mid = message["id"]
-                if mid in seen or (start_id and mid >= start_id):
+                if mid in seen or (start_id and (mid > start_id or (mid == start_id and not include_start))):
                     continue
                 seen.add(mid)
                 # A channel post's discussion can live in its linked group.
@@ -297,11 +324,26 @@ class Navigation:
                 actual_chat = chat if message["chat_id"] == chat["id"] else cloud_chat(session, message["chat_id"])
                 items.append(message_record(message, actual_chat))
                 if len(items) == request.limit:
-                    return HistoryPage(items=items, next_cursor=cursor_at(mid, digest), scanned_count=scanned).model_dump(mode="json")
-            if finished or not progressed or isinstance(request, ScheduledRequest):
+                    # A partially consumed TDLib page resumes at the last item.
+                    # Once all rows are consumed, honor the server's continuation,
+                    # including its explicit end marker.
+                    next_id = search_next if index == len(rows) - 1 and search_next is not None else mid
+                    return HistoryPage(items=items, next_cursor=cursor_at(next_id, digest) if next_id else None,
+                                       scanned_count=scanned).model_dump(mode="json")
+            if finished or isinstance(request, ScheduledRequest):
+                next_id = None
+                break
+            if search_next is not None:
+                # Empty and short search pages can still have a continuation.
+                # Pass the opaque TDLib ID through unchanged, never subtract one.
+                next_id = search_next or None
+                if next_id is None:
+                    break
+            elif not progressed:
                 next_id = None
                 break
             start_id = next_id
+            include_start = False
         return HistoryPage(items=items, next_cursor=cursor_at(next_id, digest) if next_id else None, scanned_count=scanned).model_dump(mode="json")
 
 

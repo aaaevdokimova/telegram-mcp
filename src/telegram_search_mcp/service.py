@@ -23,9 +23,11 @@ from typing import Any, Iterator, Literal
 
 from . import __version__
 from .backend import MediaError, TelegramBackend
+from .diagnostics import error_result
 from .paths import ensure_private_dir, profile_root
 from .platform_support import IS_WINDOWS, acquire_file_lock, local_data_dir
 from .platform_support import open_private_file as _open_private_file
+from .tdjson import TdlibError
 from .wire import (
     MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, PROTOCOL_VERSION,
     ServiceBusyError, ServiceError, ServiceProtocolError, ServiceStoppingError,
@@ -178,18 +180,6 @@ def _safe_unlink_socket(path: Path, expected_inode: int | None = None) -> None:
     path.unlink()
 
 
-def error_result(exc: Exception) -> dict[str, str]:
-    known = {
-        "ServiceError", "ServiceBusyError", "ServiceTimeoutError", "ServiceStoppingError",
-        "ServiceProtocolError", "SetupRequiredError", "SessionBusyError", "CursorError",
-        "PolicyError", "MediaError", "MediaTooLargeError", "ValueError", "TimeoutError",
-    }
-    name = type(exc).__name__
-    if name in known:
-        return {"code": name, "message": str(exc)[:512]}
-    return {"code": "ServiceError", "message": "Telegram operation failed. For an outgoing message, check its existing draft ID before taking any further action."}
-
-
 @dataclass
 class Job:
     request: dict[str, Any]
@@ -269,7 +259,7 @@ class LocalService:
                 while not self.queue.empty():
                     pending = self.queue.get_nowait()
                     if pending is not None and not pending.result.done():
-                        pending.result.set_result({"error": error_result(ServiceStoppingError("Telegram service is stopping; retry after it exits"))})
+                        pending.result.set_result({"error": error_result(ServiceStoppingError("Telegram service is stopping; retry after it exits"), pending.request["operation"])})
                     self.queue.task_done()
                 await self.queue.put(None)
                 await worker
@@ -308,14 +298,14 @@ class LocalService:
             try:
                 if job.result.done():
                     continue
+                operation = job.request["operation"]
                 if self.stopping.is_set():
-                    job.result.set_result({"error": error_result(ServiceStoppingError("Telegram service is stopping; retry after it exits"))})
+                    job.result.set_result({"error": error_result(ServiceStoppingError("Telegram service is stopping; retry after it exits"), operation)})
                     continue
                 if time.monotonic() >= job.deadline:
-                    job.result.set_result({"error": error_result(ServiceTimeoutError("Telegram request expired while queued; retry later"))})
+                    job.result.set_result({"error": error_result(ServiceTimeoutError("Telegram request expired while queued; retry later"), operation)})
                     continue
                 self.active = True
-                operation = job.request["operation"]
                 try:
                     # Validated against a closed allowlist; no generic TDLib RPCs.
                     params = dict(job.request["params"])
@@ -325,15 +315,18 @@ class LocalService:
                     result = await getattr(self.backend, operation)(**params)
                     response = {"result": encode_result(operation, result, include_details=include_details)}
                 except Exception as exc:
-                    response = {"error": error_result(exc)}
+                    response = {"error": error_result(exc, operation)}
                     # A completed native failure can leave native asynchronous
                     # work or trailing global TDLib updates. Retire this daemon
                     # instead of opening a second native client in its process.
-                    if isinstance(exc, RuntimeError) and not isinstance(exc, (MediaError, ServiceError)):
+                    # A TDLib error object is a completed RPC response, not a
+                    # broken native session. Access/flood/validation failures
+                    # must not evict other readers or force reinitialization.
+                    if isinstance(exc, RuntimeError) and not isinstance(exc, (MediaError, ServiceError, TdlibError)):
                         self.request_stop()
                 if not job.result.done():
                     if time.monotonic() >= job.deadline:
-                        response = {"error": error_result(ServiceTimeoutError("Telegram request deadline exceeded; retry later"))}
+                        response = {"error": error_result(ServiceTimeoutError("Telegram request deadline exceeded; retry later"), operation)}
                     job.result.set_result(response)
             finally:
                 self.active = False
@@ -352,6 +345,7 @@ class LocalService:
         job: Job | None = None
         disconnected: asyncio.Task[Any] | None = None
         request_id: str | None = None
+        operation = "service"
         should_stop = False
         authenticated = False
         try:
@@ -397,7 +391,7 @@ class LocalService:
         except Exception as exc:
             if authenticated:
                 with contextlib.suppress(ConnectionError, OSError, TimeoutError, ServiceError):
-                    await self._respond(writer, request_id, {"error": error_result(exc)})
+                    await self._respond(writer, request_id, {"error": error_result(exc, operation)})
         finally:
             if should_stop:
                 self.request_stop()

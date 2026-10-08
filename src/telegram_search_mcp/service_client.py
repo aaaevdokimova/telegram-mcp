@@ -17,6 +17,7 @@ from typing import Any, Sequence
 from .platform_support import IS_WINDOWS, acquire_file_lock, trusted_home
 
 from .backend import MediaError, MediaQuality, MediaTooLargeError, RawMedia, RawMessage, RawMessagePage
+from .diagnostics import error_result, is_diagnostic
 from .service import (
     ServicePaths, open_private_file, prepare_service_paths, require_same_user,
     service_lock_held, service_paths,
@@ -52,7 +53,7 @@ def _validate_socket(paths: ServicePaths) -> None:
         raise ServiceError("Unsafe local Telegram service socket")
 
 
-def _raise_remote(error: Any) -> None:
+def _raise_remote(error: Any, operation: str = "service") -> None:
     if not isinstance(error, dict) or set(error) != {"code", "message"}:
         raise ServiceProtocolError("Invalid service error")
     code, message = error["code"], error["message"]
@@ -67,10 +68,31 @@ def _raise_remote(error: Any) -> None:
     from .policy import PolicyError
     from .tdlib_backend import CursorError, SessionBusyError, SetupRequiredError
     classes.update({cls.__name__: cls for cls in (PolicyError, CursorError, SessionBusyError, SetupRequiredError)})
-    raise classes.get(code, ServiceError)(message)
+    exception = classes.get(code, ServiceError)(message)
+    # A current daemon already provided a correlation ID. For an older daemon,
+    # sanitize its error locally (including the old unconditional draft hint).
+    if not is_diagnostic(message, operation):
+        exception = type(exception)(error_result(exception, operation)["message"])
+    raise exception
 
 
 async def _request(paths: ServicePaths, operation: str, params: dict[str, Any], *, timeout: float) -> Any:
+    try:
+        return await _request_once(paths, operation, params, timeout=timeout)
+    except Exception as exc:
+        if is_diagnostic(str(exc), operation):
+            raise
+        result = error_result(exc, operation)
+        if isinstance(exc, _Unavailable):
+            # Preserve the pre-dispatch marker used by safe autostart recovery.
+            raise _Unavailable(result["message"]) from None
+        try:
+            _raise_remote(result, operation)
+        except Exception as safe:
+            raise safe from None
+
+
+async def _request_once(paths: ServicePaths, operation: str, params: dict[str, Any], *, timeout: float) -> Any:
     request = validate_request({"protocol": PROTOCOL_VERSION, "id": uuid.uuid4().hex,
                                 "operation": operation, "params": params, "timeout": timeout})
     _validate_socket(paths)
@@ -88,7 +110,7 @@ async def _request(paths: ServicePaths, operation: str, params: dict[str, Any], 
             except OSError as exc:
                 if isinstance(exc, (FileNotFoundError, ConnectionRefusedError)) or exc.errno in (errno.ENOENT, errno.ECONNREFUSED):
                     raise _Unavailable("Telegram service is not running") from exc
-                raise ServiceError("Unable to connect to the private Telegram service") from exc
+                raise
             if paths.transport == "unix":
                 require_same_user(writer.get_extra_info("socket"))
             await write_frame(writer, request, MAX_REQUEST_BYTES)
@@ -99,12 +121,14 @@ async def _request(paths: ServicePaths, operation: str, params: dict[str, Any], 
                     or set(response) not in ({"protocol", "id", "result"}, {"protocol", "id", "error"})):
                 raise ServiceProtocolError("Invalid response or service protocol mismatch; restart the service")
             if "error" in response:
-                _raise_remote(response["error"])
+                _raise_remote(response["error"], operation)
             return decode_result(operation, response["result"])
     except TimeoutError as exc:
+        if is_diagnostic(str(exc), operation):
+            raise
         raise ServiceTimeoutError("Telegram service request timed out; active native work will finish safely") from exc
     except (asyncio.IncompleteReadError, ConnectionError) as exc:
-        raise ServiceError("Telegram service connection ended. For outgoing messages, check the same draft ID; never create a replacement to retry") from exc
+        raise ConnectionError("Telegram service connection ended") from exc
     finally:
         if writer is not None:
             writer.close()
@@ -274,6 +298,17 @@ class SharedTelegramBackend(WorkflowMethods):
         self.autostart = autostart
 
     async def _call(self, operation: str, params: dict[str, Any]) -> Any:
+        try:
+            return await self._call_once(operation, params)
+        except Exception as exc:
+            if is_diagnostic(str(exc), operation):
+                raise
+            try:
+                _raise_remote(error_result(exc, operation), operation)
+            except Exception as safe:
+                raise safe from None
+
+    async def _call_once(self, operation: str, params: dict[str, Any]) -> Any:
         from .wire import OUTGOING_OPERATIONS
         if operation in OUTGOING_OPERATIONS:
             params = {**params, "include_details": True}

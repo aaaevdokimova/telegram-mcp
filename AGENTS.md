@@ -76,5 +76,21 @@ LaunchAgents while implementing repository changes.
   CI publishes a new GitHub Release only after tests and archive checks succeed;
   published tags/assets are historical and must not be replaced with new code.
 
+## Releasing fixes
+
+Before cutting a release, identify the owner's installed version and revision and
+compare any known local fixes with canonical main. A higher version number is not
+evidence that an unpublished fix is included. Port those fixes with regressions
+before publication; preserve Windows support and the existing client preferences.
+
+Record synthetic/package checks separately from authenticated Telegram acceptance.
+When the owner has authorized the release and their local upgrade, install the
+verified asset from that exact published tag, record its Git revision in the
+installation receipt, and run `scripts/verify-live-release.py` on an explicitly
+selected chat. Confirm the installed package, running service and release agree,
+and check `tgsearch update --check`. Do not call a release fully accepted while the
+owner is unknowingly using a different local build. This does not authorize a
+personal upgrade or reading private chats during ordinary repository development.
+
 See [Codex AGENTS.md documentation](https://learn.chatgpt.com/docs/agent-configuration/agents-md)
 for how repository instructions are loaded.

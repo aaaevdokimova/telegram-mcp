@@ -1,5 +1,31 @@
 # Verification
 
+## Version 0.9.3 — Read reliability and release alignment
+
+This release incorporates the September read-reliability fix that was installed
+locally as 0.8.1 but was absent from the public 0.9 series. Windows transport,
+credentials and public-search consent behavior are retained. Regression coverage
+uses structured native IDs and validates history, date bounds, context, native
+continuations, read-error diagnostics, and service survival over Unix sockets and
+authenticated loopback TCP. These tests are required in release CI.
+
+The updater refuses to overwrite unpublished local revisions and explains the
+recovery step. Scheduled failures remain visible in `tgsearch updates status`
+until a successful check replaces them.
+
+For an explicitly authorized owner acceptance, run the released installed Python
+with `scripts/verify-live-release.py --install-root INSTALL_ROOT --version VERSION
+--revision RELEASE_SHA --chat-id SELECTED_CHAT_ID --query SELECTED_QUERY`. It
+checks the installation receipt and running service against the release, then
+reads bounded history/search/context through the installed MCP. It never sends,
+creates drafts, consumes public-search quota, or prints retrieved message text.
+This is a separate live acceptance step; synthetic CI must not be described as
+proof of an authenticated Telegram read.
+
+Local and published acceptance results are recorded by the release operator;
+Windows desktop CI continues to validate installation and discovery, without
+claiming a real Windows account/UI acceptance.
+
 ## Version 0.9.2 — English documentation and Windows desktop verification
 
 All installation guides and user-facing examples are in English. Unicode fixture

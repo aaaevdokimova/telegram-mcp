@@ -230,7 +230,7 @@ def command_updates(args: argparse.Namespace) -> int:
     from .activation import read_notice
     from .installation import read_receipt
     from .launchers import installed_root
-    from .updater import set_enabled
+    from .updater import read_update_status, set_enabled
     root = installed_root()
     if root is None:
         raise RuntimeError("Run updates from an installed copy")
@@ -239,7 +239,7 @@ def command_updates(args: argparse.Namespace) -> int:
     receipt = read_receipt(root)
     print(json.dumps({"automatic": receipt.get("auto_update", False), "channel": "checked-main",
                       "interval_hours": 24, "revision": receipt.get("revision"), "version": receipt.get("version"),
-                      "notice": read_notice(root)}, indent=2))
+                      "notice": read_notice(root), "last_check": read_update_status(root)}, indent=2))
     return 0
 
 

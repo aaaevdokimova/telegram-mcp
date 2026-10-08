@@ -5,6 +5,7 @@ import stat
 import subprocess
 import tomllib
 import zipfile
+from urllib.error import HTTPError
 
 import pytest
 
@@ -33,6 +34,84 @@ def test_only_successful_ci_for_the_exact_canonical_main_commit_is_eligible(monk
 def test_verified_main_is_eligible_without_a_github_login(monkeypatch):
     monkeypatch.setattr(updater, "_json", lambda url: {"sha": REVISION} if url.endswith("/commits/main") else {"workflow_runs": [successful_run()]})
     assert updater.checked_revision() == REVISION
+
+
+@pytest.mark.parametrize("code", [404, 403, 500])
+def test_unknown_local_revision_is_explained_without_replacing_local_fixes(managed, monkeypatch, code):
+    root, old, config = managed
+    receipt_path = root / installation.RECEIPT
+    receipt = installation.read_receipt(root)
+    receipt["revision"] = "b" * 40
+    receipt_path.write_text(json.dumps(receipt))
+    before = config.read_bytes()
+    monkeypatch.setattr(updater, "checked_revision", lambda: REVISION)
+    def unavailable(url):
+        assert url.endswith("/compare/" + "b" * 40 + "..." + REVISION)
+        raise HTTPError(url, code, "unavailable", None, None)
+    monkeypatch.setattr(updater, "_json", unavailable)
+    monkeypatch.setattr(installation, "_stage_version", lambda *args: pytest.fail("must not stage"))
+    expected = updater.UnpublishedRevisionError if code == 404 else HTTPError
+    with pytest.raises(expected) as error:
+        updater.update(root, check_only=True)
+    if code == 404:
+        assert "preserve local fixes" in str(error.value)
+        assert "verified published release" in str(error.value)
+    assert launchers.current_version(root) == old
+    assert config.read_bytes() == before
+    assert installation.read_receipt(root) == receipt
+    assert not (root / updater.STATUS_FILE).exists()
+
+
+def test_scheduled_failure_is_visible_in_status_and_success_clears_it(managed, monkeypatch, capsys):
+    from argparse import Namespace
+    from telegram_search_mcp import cli
+    root, _, _ = managed
+    monkeypatch.setattr(updater.sys, "argv", ["updater", "--scheduled", "--install-root", str(root)])
+    monkeypatch.setattr(updater, "update", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("private error details")))
+    with pytest.raises(SystemExit):
+        updater.main()
+    status = updater.read_update_status(root)
+    assert status["status"] == "failed"
+    assert "private error details" not in json.dumps(status)
+    monkeypatch.setattr(launchers, "installed_root", lambda: root)
+    capsys.readouterr()
+    assert cli.command_updates(Namespace(action="status")) == 0
+    assert json.loads(capsys.readouterr().out)["last_check"]["status"] == "failed"
+    monkeypatch.setattr(updater, "update", lambda *args, **kwargs: {"status": "up_to_date", "revision": REVISION})
+    updater.main()
+    assert updater.read_update_status(root)["status"] == "up_to_date"
+
+
+def test_throttled_scheduled_check_retains_the_last_failure(managed, monkeypatch):
+    root, _, _ = managed
+    updater.record_update_status(root, {"status": "failed", "message": "previous check failed"})
+    before = (root / updater.STATUS_FILE).read_bytes()
+    monkeypatch.setattr(updater.sys, "argv", ["updater", "--scheduled", "--install-root", str(root)])
+    monkeypatch.setattr(updater, "update", lambda *args, **kwargs: {"status": "not_due"})
+    updater.main()
+    assert (root / updater.STATUS_FILE).read_bytes() == before
+
+
+@pytest.mark.parametrize("failure", [False, True])
+def test_check_only_remains_read_only_even_with_scheduled_flag(managed, monkeypatch, failure):
+    root, _, config = managed
+    paths = [root / installation.RECEIPT, config, root / "updates.log",
+             root / "last-update-check.json", root / updater.STATUS_FILE]
+    for path in paths[2:]:
+        path.write_text("preserved")
+    before = {path: path.read_bytes() for path in paths}
+    monkeypatch.setattr(updater.sys, "argv", ["updater", "--scheduled", "--check", "--install-root", str(root)])
+    def checked():
+        if failure:
+            raise RuntimeError("offline")
+        return REVISION
+    monkeypatch.setattr(updater, "checked_revision", checked)
+    if failure:
+        with pytest.raises(SystemExit):
+            updater.main()
+    else:
+        updater.main()
+    assert {path: path.read_bytes() for path in paths} == before
 
 
 def source_zip(extra=None):

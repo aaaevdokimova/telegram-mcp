@@ -16,6 +16,7 @@ import sys
 import tempfile
 import time
 from urllib.parse import urlencode, urlparse
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 import zipfile
 
@@ -29,6 +30,27 @@ API = "https://api.github.com/repos/" + REPOSITORY
 CHECK_INTERVAL = 86400
 MAX_DOWNLOAD = 20 * 1024 * 1024
 LABEL_PREFIX = "io.github.prabchevski.telegram-search-mcp.update."
+STATUS_FILE = "last-update-status.json"
+
+
+class UnpublishedRevisionError(RuntimeError):
+    """A local revision cannot be safely replaced by an automatic update."""
+
+
+def read_update_status(root: Path) -> dict | None:
+    source = read_source(root / STATUS_FILE)
+    if source is None:
+        return None
+    value = json.loads(source)
+    if not isinstance(value, dict):
+        raise RuntimeError("Invalid saved update status")
+    return value
+
+
+def record_update_status(root: Path, result: dict) -> None:
+    path = root / STATUS_FILE
+    atomic_write(path, (json.dumps({**result, "checked_at": time.time()}) + "\n").encode(),
+                 expected=read_source(path))
 
 
 def _download(url: str, *, limit: int) -> bytes:
@@ -229,7 +251,7 @@ def update(root: Path, *, scheduled: bool = False, check_only: bool = False) -> 
             from .activation import RESTART_MESSAGE
             print(RESTART_MESSAGE)
     check_file = root / "last-update-check.json"
-    if scheduled:
+    if scheduled and not check_only:
         previous_check = read_source(check_file)
         if previous_check is not None:
             previous_time = json.loads(previous_check).get("time", 0)
@@ -242,7 +264,16 @@ def update(root: Path, *, scheduled: bool = False, check_only: bool = False) -> 
     if candidate == receipt.get("revision"):
         return {"status": "up_to_date", "revision": candidate}
     if receipt.get("revision"):
-        comparison = _json(API + "/compare/" + receipt["revision"] + "..." + candidate)
+        try:
+            comparison = _json(API + "/compare/" + receipt["revision"] + "..." + candidate)
+        except HTTPError as exc:
+            if exc.code != 404:
+                raise
+            raise UnpublishedRevisionError(
+                "The installed revision is not available in the canonical repository. "
+                "Automatic replacement was stopped to preserve local fixes. "
+                "Include those fixes in main, then install a verified published release once."
+            ) from None
         if comparison.get("status") not in ("ahead", "identical"):
             raise RuntimeError("Automatic downgrade or divergent update refused")
     if check_only:
@@ -294,7 +325,7 @@ def main() -> None:
     if root is None:
         raise SystemExit("Run the updater from an installed copy")
     try:
-        if args.scheduled:
+        if args.scheduled and not args.check:
             from .service import open_private_file
             descriptor = open_private_file(root / "updates.log")
             try:
@@ -303,9 +334,17 @@ def main() -> None:
             finally:
                 os.close(descriptor)
         result = update(root, scheduled=args.scheduled, check_only=args.check)
+        if args.scheduled and not args.check and result["status"] not in ("not_due", "disabled"):
+            record_update_status(root, result)
         if result["status"] not in ("not_due", "disabled", "up_to_date", "waiting_for_ci") or not args.scheduled:
             print(json.dumps(result))
     except Exception as exc:
+        if args.scheduled and not args.check:
+            record_update_status(root, {
+                "status": "failed", "error_type": type(exc).__name__,
+                "message": str(exc) if isinstance(exc, UnpublishedRevisionError) else
+                "Update failed. Run tgsearch update --check or inspect updates.log for details.",
+            })
         print(f"Telegram Search update failed: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
 

@@ -34,7 +34,10 @@ IGNORED_DIRS = frozenset(
 REQUIRED_FILES = frozenset(
     {"pyproject.toml", "uv.lock", "README.md", "LICENSE", "AGENTS.md", "GEMINI.md", "INSTALL.md", "INSTALL_MACOS.md", "INSTALL_WINDOWS.md", "START_HERE.md",
      "UNINSTALL_MACOS.md", "install-macos.command", "uninstall-macos.command", "scripts/release.py",
-     "scripts/install.py", WINDOWS_ASSETS_SOURCE, "src/telegram_search_mcp/__init__.py"}
+     "scripts/install.py", WINDOWS_ASSETS_SOURCE, "src/telegram_search_mcp/__init__.py",
+     "scripts/verify-live-release.py", "tests/test_read_navigation_regressions.py",
+     "tests/test_context_regressions.py", "tests/test_read_error_regressions.py",
+     "tests/test_read_service_regressions.py"}
 )
 ROOT_FILES = REQUIRED_FILES | {
     ".gitignore", "NOTICE", "update-macos.command", "uninstall-macos.command"
@@ -153,6 +156,9 @@ def inventory(source: Path) -> dict[str, bytes]:
         for filename in filenames:
             child = parent / filename
             name = child.relative_to(source).as_posix()
+            if name == ".git" and not child.is_symlink():
+                # Managed worktrees use a Git pointer file instead of a directory.
+                continue
             if child.is_symlink() or not child.is_file():
                 raise ReleaseError(f"Only regular files may ship: {name}")
             data = child.read_bytes()

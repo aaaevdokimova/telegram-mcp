@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 from pathlib import Path
 import stat
 import zipfile
@@ -92,12 +93,18 @@ def test_symlinks_cannot_import_external_data(source: Path, tmp_path: Path, dire
     if directory:
         external.mkdir()
         (external / "test_private.py").write_text("secret")
+        shutil.rmtree(source / "tests", ignore_errors=True)
         (source / "tests").symlink_to(external, target_is_directory=True)
     else:
         external.write_text("secret")
         (source / "CHANGELOG.md").symlink_to(external)
     with pytest.raises(release.ReleaseError, match="[Ss]ymlink|regular"):
         release.inventory(source)
+
+
+def test_worktree_git_pointer_is_never_packaged(source: Path) -> None:
+    (source / ".git").write_text("gitdir: ../private-git-metadata\n")
+    assert ".git" not in release.inventory(source)
 
 
 def test_archive_tampering_is_detected(source: Path, tmp_path: Path) -> None:

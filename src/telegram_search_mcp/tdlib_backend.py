@@ -658,34 +658,77 @@ class TDLibBackend(WorkflowMethods):
     def _get_context_sync(
         self, *, chat_id: int, message_id: int, before: int, after: int
     ) -> Sequence[RawMessage]:
+        """Return the anchor and nearest supported neighbors, oldest first."""
+
+        if any(type(count) is not int or not 0 <= count <= 5 for count in (before, after)):
+            raise ValueError("before and after must be integers between 0 and 5")
         policy = Policy.load(self.profile)
         with self._operation_lock:
             deadline = time.monotonic() + OPERATION_TIMEOUT
             session = self._ready(policy, timeout=_remaining(deadline, 30.0))
             chat = session.get_chat(chat_id, timeout=_remaining(deadline, 10.0))
             _reject_secret_chat(chat)
-            response = session.request(
-                TdApi.get_message_context(
-                    chat_id,
-                    message_id,
-                    older=before,
-                    newer=after,
-                    only_local=False,
-                ),
+            message = session.request(
+                TdApi.get_message(chat_id, message_id),
                 timeout=_remaining(deadline, 20.0),
             )
             title_cache = {int(chat_id): str(chat.get("title", ""))}
-            parsed = [
-                item
-                for message in (response.get("messages") or ())
-                if isinstance(message, dict)
-                and (
-                    item := _raw_message(
-                        session, message, title_cache, deadline=deadline
+            anchor = None
+            if message.get("chat_id") == chat_id and message.get("id") == message_id:
+                anchor = _raw_message(session, message, title_cache, deadline=deadline)
+            if anchor is None:
+                self._verify_profile(policy, session)
+                return ()
+
+            def neighbors(count: int, *, newer: bool) -> list[RawMessage]:
+                selected: list[RawMessage] = []
+                position = message_id
+                scanned = 0
+                stalled = False
+                while len(selected) < count:
+                    if scanned >= MAX_RAW_PAGES * RAW_PAGE_SIZE:
+                        raise TimeoutError("Telegram context scan limit reached before all supported neighbors were found")
+                    # The pinned TDLib OrderedMessages::get_history excludes an
+                    # exact from_message_id at offset 0 and includes it at -1.
+                    # Walk newer messages one at a time: a short reverse-ordered
+                    # window must not skip the neighbors nearest the anchor.
+                    response = session.request(
+                        TdApi.get_chat_history(
+                            chat_id,
+                            from_message_id=position,
+                            offset=-2 if newer else 0,
+                            limit=2 if newer else RAW_PAGE_SIZE,
+                            only_local=False,
+                        ),
+                        timeout=_remaining(deadline, 20.0),
                     )
-                )
-                is not None
-            ]
+                    raw = {
+                        int(item["id"]): item
+                        for item in (response.get("messages") or ())
+                        if isinstance(item, dict)
+                        and item.get("chat_id") == chat_id
+                        and isinstance(item.get("id"), int)
+                        and (item["id"] > position if newer else 0 < item["id"] < position)
+                    }
+                    if not raw:
+                        # Nonempty cold pages can trigger TDLib's asynchronous
+                        # preload. Refetch once before accepting a boundary.
+                        if stalled:
+                            break
+                        stalled = True
+                        continue
+                    stalled = False
+                    for next_id in sorted(raw, reverse=not newer):
+                        position = next_id
+                        scanned += 1
+                        item = _raw_message(session, raw[next_id], title_cache, deadline=deadline)
+                        if item is not None:
+                            selected.append(item)
+                            if len(selected) == count:
+                                break
+                return selected
+
+            parsed = [*neighbors(before, newer=False), anchor, *neighbors(after, newer=True)]
             parsed.sort(key=lambda item: (item.sent_at, item.chat_id, item.message_id))
             self._verify_profile(policy, session)
             return tuple(parsed)
